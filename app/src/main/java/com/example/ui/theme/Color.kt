@@ -2,54 +2,54 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Sleek Interface Theme Palette
-val SleekBluePrimary = Color(0xFF005AC1)
+// Apple-inspired SIRA palette: bright, calm surfaces with one strong accent.
+val SleekBluePrimary = Color(0xFF007AFF)
 val SleekBlueOnPrimary = Color(0xFFFFFFFF)
-val SleekBlueContainer = Color(0xFFD3E3FD)
-val SleekBlueOnContainer = Color(0xFF001D36)
+val SleekBlueContainer = Color(0xFFEAF3FF)
+val SleekBlueOnContainer = Color(0xFF003A70)
 
-val SleekSecondary = Color(0xFF00639B)
+val SleekSecondary = Color(0xFF5856D6)
 val SleekOnSecondary = Color(0xFFFFFFFF)
-val SleekSecondaryContainer = Color(0xFFD1E1FF)
-val SleekOnSecondaryContainer = Color(0xFF001D35)
+val SleekSecondaryContainer = Color(0xFFF0EEFF)
+val SleekOnSecondaryContainer = Color(0xFF302D76)
 
-val SleekTertiaryPurple = Color(0xFF6750A4)
-val SleekTertiaryContainer = Color(0xFFE8DEF8)
-val SleekOnTertiaryContainer = Color(0xFF21005D)
+val SleekTertiaryPurple = Color(0xFFAF52DE)
+val SleekTertiaryContainer = Color(0xFFF8ECFF)
+val SleekOnTertiaryContainer = Color(0xFF5A1B73)
 
-val SleekError = Color(0xFFBA1A1A)
-val SleekErrorContainer = Color(0xFFFFDAD6)
-val SleekOnErrorContainer = Color(0xFF410002)
+val SleekError = Color(0xFFFF3B30)
+val SleekErrorContainer = Color(0xFFFFECEB)
+val SleekOnErrorContainer = Color(0xFF7A140E)
 
-val SleekSuccess = Color(0xFF146C2E)
-val SleekSuccessContainer = Color(0xFFDCFCE7)
-val SleekOnSuccessContainer = Color(0xFF002107)
+val SleekSuccess = Color(0xFF34C759)
+val SleekSuccessContainer = Color(0xFFEAF9EE)
+val SleekOnSuccessContainer = Color(0xFF145A26)
 
-// Neutral & Surfaces (Sleek crisp aesthetic)
-val SleekBackground = Color(0xFFFDFBFF)
+// Neutral iOS-like surfaces.
+val SleekBackground = Color(0xFFF5F5F7)
 val SleekSurface = Color(0xFFFFFFFF)
-val SleekSurfaceVariant = Color(0xFFF2F0F4)
+val SleekSurfaceVariant = Color(0xFFEFEFF1)
 val SleekSurfaceCard = Color(0xFFFFFFFF)
-val SleekNavBackground = Color(0xFFF3F4F9)
+val SleekNavBackground = Color(0xFFF2F2F7)
 
-val SleekTextPrimary = Color(0xFF1A1C1E)
-val SleekTextSecondary = Color(0xFF44474E)
-val SleekTextTertiary = Color(0xFF74777F)
-val SleekOutline = Color(0xFFE1E2E6)
-val SleekOutlineVariant = Color(0xFFC4C6D0)
+val SleekTextPrimary = Color(0xFF1D1D1F)
+val SleekTextSecondary = Color(0xFF6E6E73)
+val SleekTextTertiary = Color(0xFF8E8E93)
+val SleekOutline = Color(0xFFD2D2D7)
+val SleekOutlineVariant = Color(0xFFE5E5EA)
 
-// Dark Theme Variants
-val SleekBluePrimaryDark = Color(0xFFA8C7FA)
-val SleekBlueOnPrimaryDark = Color(0xFF002D67)
-val SleekBlueContainerDark = Color(0xFF004390)
-val SleekBlueOnContainerDark = Color(0xFFD3E3FD)
+// Dark mode.
+val SleekBluePrimaryDark = Color(0xFF0A84FF)
+val SleekBlueOnPrimaryDark = Color(0xFFFFFFFF)
+val SleekBlueContainerDark = Color(0xFF073B73)
+val SleekBlueOnContainerDark = Color(0xFFDCEBFF)
 
-val SleekSecondaryDark = Color(0xFF90CCF8)
-val SleekSecondaryContainerDark = Color(0xFF004A75)
+val SleekSecondaryDark = Color(0xFF5E5CE6)
+val SleekSecondaryContainerDark = Color(0xFF39368A)
 
-val SleekBackgroundDark = Color(0xFF111318)
-val SleekSurfaceDark = Color(0xFF191C20)
-val SleekSurfaceVariantDark = Color(0xFF44474E)
-val SleekTextPrimaryDark = Color(0xFFE2E2E6)
-val SleekTextSecondaryDark = Color(0xFFC4C6D0)
-val SleekOutlineDark = Color(0xFF44474E)
+val SleekBackgroundDark = Color(0xFF000000)
+val SleekSurfaceDark = Color(0xFF1C1C1E)
+val SleekSurfaceVariantDark = Color(0xFF2C2C2E)
+val SleekTextPrimaryDark = Color(0xFFF5F5F7)
+val SleekTextSecondaryDark = Color(0xFF98989D)
+val SleekOutlineDark = Color(0xFF38383A)

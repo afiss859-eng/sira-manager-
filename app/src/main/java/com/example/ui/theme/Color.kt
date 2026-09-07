@@ -14,6 +14,8 @@ val SleekSecondaryContainer = Color(0xFFF0EEFF)
 val SleekOnSecondaryContainer = Color(0xFF302D76)
 
 val SleekTertiaryPurple = Color(0xFFAF52DE)
+// Compatibility alias for screens using the shorter name.
+val SleekTertiary = SleekTertiaryPurple
 val SleekTertiaryContainer = Color(0xFFF8ECFF)
 val SleekOnTertiaryContainer = Color(0xFF5A1B73)
 

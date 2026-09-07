@@ -56,6 +56,7 @@ fun SiraTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = SiraShapes,
         content = content
     )
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -18,18 +19,16 @@ fun SiraCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    val cardModifier = if (onClick != null) modifier.clickable { onClick() } else modifier
+    val cardModifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier
     Surface(
         modifier = cardModifier,
-        shape = MaterialTheme.shapes.medium,
+        shape = SiraCardShape,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
-        shadowElevation = 2.dp,
+        shadowElevation = 1.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Box(modifier = Modifier.padding(1.dp)) {
-            content()
-        }
+        Box(modifier = Modifier.padding(1.dp)) { content() }
     }
 }
 
@@ -39,5 +38,10 @@ fun SiraSoftBackground(content: @Composable () -> Unit) {
         content()
     }
 }
+
+val SiraScreenShape = RoundedCornerShape(24.dp)
+val SiraCardShape = RoundedCornerShape(18.dp)
+val SiraControlShape = RoundedCornerShape(14.dp)
+val SiraPillShape = RoundedCornerShape(50)
 
 const val SiraHairlineDp = 1

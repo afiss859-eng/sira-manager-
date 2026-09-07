@@ -1,10 +1,12 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.entity.CashChannel
 import com.example.data.entity.CashTransaction
+import com.example.ui.theme.*
 import com.example.viewmodel.SiraViewModel
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -33,43 +36,37 @@ fun CashflowScreen(
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.FRENCH) }
     val dateFormat = remember { SimpleDateFormat("dd/MM HH:mm", Locale.FRENCH) }
 
-    // Balances per channel
     val cashRegisterBalance = remember(cashTx) {
-        cashTx.filter { it.channel == CashChannel.ESPECES }
-            .sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }
+        cashTx.filter { it.channel == CashChannel.ESPECES }.sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }
     }
-
     val orangeMoneyBalance = remember(cashTx) {
-        cashTx.filter { it.channel == CashChannel.ORANGE_MONEY }
-            .sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }
+        cashTx.filter { it.channel == CashChannel.ORANGE_MONEY }.sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }
     }
-
     val moovMoneyBalance = remember(cashTx) {
-        cashTx.filter { it.channel == CashChannel.MOOV_MONEY }
-            .sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }
+        cashTx.filter { it.channel == CashChannel.MOOV_MONEY }.sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }
     }
-
     val corisBalance = remember(cashTx) {
-        cashTx.filter { it.channel == CashChannel.CORIS_MONEY }
-            .sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }
+        cashTx.filter { it.channel == CashChannel.CORIS_MONEY }.sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }
     }
-
     val totalCashflow = cashRegisterBalance + orangeMoneyBalance + moovMoneyBalance + corisBalance
-
     val filteredTransactions = remember(cashTx, selectedChannelFilter) {
-        if (selectedChannelFilter == null) cashTx
-        else cashTx.filter { it.channel == selectedChannelFilter }
+        selectedChannelFilter?.let { channel -> cashTx.filter { it.channel == channel } } ?: cashTx
     }
 
     Scaffold(
+        containerColor = SleekBackground,
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = onNewCashOpClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = SleekBluePrimary,
+                contentColor = Color.White,
+                shape = SiraPillShape,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 5.dp),
                 modifier = Modifier.testTag("fab_new_cash_op")
             ) {
-                Icon(Icons.Default.AddCard, contentDescription = "Opération Caisse")
+                Icon(Icons.Default.AddCard, contentDescription = null, modifier = Modifier.size(19.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Nouvelle opération", fontWeight = FontWeight.SemiBold)
             }
         }
     ) { innerPadding ->
@@ -79,105 +76,75 @@ fun CashflowScreen(
                 .padding(innerPadding)
                 .testTag("cashflow_screen")
         ) {
-            // Header Balance Card
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Trésorerie & Soldes Multi-Canaux",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "Total liquidités disponibles : ${numberFormat.format(totalCashflow.toLong())} FCFA",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    )
+            Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+                Text("Trésorerie", fontSize = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.7).sp, color = SleekTextPrimary)
+                Spacer(Modifier.height(3.dp))
+                Text("Une vue simple de vos liquidités et mouvements.", fontSize = 13.sp, color = SleekTextSecondary)
+                Spacer(Modifier.height(15.dp))
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Channel balances grid
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ChannelBalanceMiniCard(
-                            title = "Espèces",
-                            amount = "${numberFormat.format(cashRegisterBalance.toLong())} F",
-                            modifier = Modifier.weight(1f)
-                        )
-                        ChannelBalanceMiniCard(
-                            title = "Orange M.",
-                            amount = "${numberFormat.format(orangeMoneyBalance.toLong())} F",
-                            modifier = Modifier.weight(1f)
-                        )
-                        ChannelBalanceMiniCard(
-                            title = "Moov M.",
-                            amount = "${numberFormat.format(moovMoneyBalance.toLong())} F",
-                            modifier = Modifier.weight(1f)
-                        )
+                Surface(
+                    shape = SiraScreenShape,
+                    color = SleekSurface,
+                    border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.7f)),
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(19.dp)) {
+                        Text("SOLDE TOTAL", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.9.sp, color = SleekTextTertiary)
+                        Spacer(Modifier.height(3.dp))
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(numberFormat.format(totalCashflow.toLong()), fontSize = 32.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp, color = SleekTextPrimary)
+                            Spacer(Modifier.width(6.dp))
+                            Text("FCFA", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = SleekTextSecondary, modifier = Modifier.padding(bottom = 5.dp))
+                        }
+                        Spacer(Modifier.height(15.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BalanceCell("Espèces", cashRegisterBalance, SleekBluePrimary, Modifier.weight(1f))
+                            BalanceCell("Orange", orangeMoneyBalance, Color(0xFFFF7900), Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BalanceCell("Moov", moovMoneyBalance, SleekSecondary, Modifier.weight(1f))
+                            BalanceCell("Coris", corisBalance, SleekTertiary, Modifier.weight(1f))
+                        }
                     }
                 }
-            }
 
-            // Channel Filter Chips
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    FilterChip(
-                        selected = selectedChannelFilter == null,
-                        onClick = { selectedChannelFilter = null },
-                        label = { Text("Tous les comptes") }
-                    )
+                Spacer(Modifier.height(13.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
+                    item { CashFilterChip("Tous", selectedChannelFilter == null) { selectedChannelFilter = null } }
+                    items(CashChannel.values()) { channel ->
+                        CashFilterChip(channel.label, selectedChannelFilter == channel) { selectedChannelFilter = channel }
+                    }
                 }
-                items(CashChannel.values()) { channel ->
-                    FilterChip(
-                        selected = selectedChannelFilter == channel,
-                        onClick = { selectedChannelFilter = channel },
-                        label = { Text(channel.label) }
-                    )
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("MOUVEMENTS RÉCENTS", fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = SleekTextTertiary)
+                    Text("${filteredTransactions.size}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = SleekBluePrimary)
                 }
-            }
-
-            // Transactions List Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "HISTORIQUE DES MOUVEMENTS (${filteredTransactions.size})",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary
-                )
             }
 
             if (filteredTransactions.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Aucun mouvement de caisse enregistré.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(Modifier.fillMaxSize().padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
+                    Surface(shape = SiraCardShape, color = SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.65f)), modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(28.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Surface(shape = CircleShape, color = SleekSurfaceVariant, modifier = Modifier.size(54.dp)) {
+                                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = SleekTextTertiary, modifier = Modifier.size(25.dp)) }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Text("Aucun mouvement", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SleekTextPrimary)
+                            Text("Les opérations de caisse apparaîtront ici.", fontSize = 11.sp, color = SleekTextSecondary)
+                        }
+                    }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 4.dp + 82.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredTransactions, key = { it.id }) { tx ->
-                        CashTransactionRow(
-                            tx = tx,
-                            numberFormat = numberFormat,
-                            dateFormat = dateFormat
-                        )
+                        CashTransactionRow(tx, numberFormat, dateFormat)
                     }
                 }
             }
@@ -186,21 +153,30 @@ fun CashflowScreen(
 }
 
 @Composable
-private fun ChannelBalanceMiniCard(
-    title: String,
-    amount: String,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        modifier = modifier
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(amount, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+private fun BalanceCell(title: String, amount: Double, color: Color, modifier: Modifier) {
+    Surface(shape = RoundedCornerShape(14.dp), color = color.copy(alpha = 0.08f), border = BorderStroke(1.dp, color.copy(alpha = 0.1f)), modifier = modifier) {
+        Column(Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) {
+            Text(title, fontSize = 10.sp, color = SleekTextSecondary)
+            Spacer(Modifier.height(2.dp))
+            Text("${NumberFormat.getIntegerInstance(Locale.FRENCH).format(amount.toLong())} F", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = color)
         }
     }
+}
+
+@Composable
+private fun CashFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium) },
+        shape = SiraPillShape,
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = SleekBlueContainer,
+            selectedLabelColor = SleekBlueOnContainer,
+            containerColor = SleekSurface
+        ),
+        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = selected, borderColor = SleekOutline.copy(alpha = 0.65f), selectedBorderColor = SleekBluePrimary.copy(alpha = 0.22f))
+    )
 }
 
 @Composable
@@ -210,65 +186,34 @@ private fun CashTransactionRow(
     dateFormat: SimpleDateFormat
 ) {
     val isCredit = tx.type.isCredit
-
+    val accent = if (isCredit) SleekSuccess else SleekError
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        shape = SiraCardShape,
+        color = SleekSurface,
+        border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.62f)),
+        shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isCredit) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
-                    modifier = Modifier.size(38.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (isCredit) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
-                            contentDescription = null,
-                            tint = if (isCredit) Color(0xFF15803D) else Color(0xFFB91C1C),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column {
-                    Text(
-                        text = tx.description,
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "${tx.channel.label} • ${dateFormat.format(Date(tx.timestamp))}" +
-                                if (!tx.beneficiaryOrPayer.isNullOrBlank()) " • ${tx.beneficiaryOrPayer}" else "",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = RoundedCornerShape(13.dp), color = accent.copy(alpha = 0.1f), modifier = Modifier.size(42.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(if (isCredit) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward, contentDescription = null, tint = accent, modifier = Modifier.size(19.dp))
                 }
             }
-
-            Column(horizontalAlignment = Alignment.End) {
+            Spacer(Modifier.width(11.dp))
+            Column(Modifier.weight(1f)) {
+                Text(tx.description, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = SleekTextPrimary, maxLines = 1)
                 Text(
-                    text = "${if (isCredit) "+" else "-"}${numberFormat.format(tx.amount.toLong())} F",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isCredit) Color(0xFF15803D) else Color(0xFFB91C1C)
+                    "${tx.channel.label} • ${dateFormat.format(Date(tx.timestamp))}" + if (!tx.beneficiaryOrPayer.isNullOrBlank()) " • ${tx.beneficiaryOrPayer}" else "",
+                    fontSize = 10.sp,
+                    color = SleekTextTertiary,
+                    maxLines = 1
                 )
-                if (tx.fee > 0) {
-                    Text(
-                        text = "Frais: ${numberFormat.format(tx.fee.toLong())} F",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            }
+            Spacer(Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${if (isCredit) "+" else "-"}${numberFormat.format(tx.amount.toLong())} F", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = accent)
+                if (tx.fee > 0) Text("Frais ${numberFormat.format(tx.fee.toLong())} F", fontSize = 9.sp, color = SleekTextTertiary)
             }
         }
     }

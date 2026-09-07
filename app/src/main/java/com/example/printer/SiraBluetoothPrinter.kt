@@ -26,7 +26,7 @@ class SiraBluetoothPrinter(private val context: Context) {
     }
 
     fun setDefaultPrinter(macAddress: String) {
-        require(BluetoothDevice.checkBluetoothAddress(macAddress)) { "Adresse Bluetooth invalide" }
+        require(BluetoothAdapter.checkBluetoothAddress(macAddress)) { "Adresse Bluetooth invalide" }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_MAC, macAddress.uppercase())
             .apply()

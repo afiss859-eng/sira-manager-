@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -13,13 +14,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.entity.Product
+import com.example.ui.theme.*
 import com.example.viewmodel.SiraViewModel
 import java.text.NumberFormat
 import java.util.Locale
@@ -36,124 +38,114 @@ fun InventoryScreen(
     var filterLowStockOnly by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.FRENCH) }
-
-    val categories = remember(products) {
-        listOf("Tous") + products.map { it.category }.distinct()
-    }
-
+    val categories = remember(products) { listOf("Tous") + products.map { it.category }.distinct() }
     val filteredProducts = remember(products, selectedCategory, filterLowStockOnly, searchQuery) {
         products.filter { product ->
             val matchCat = selectedCategory == "Tous" || product.category == selectedCategory
             val matchLowStock = !filterLowStockOnly || product.isLowStock
-            val matchQuery = searchQuery.isBlank() ||
-                    product.name.contains(searchQuery, ignoreCase = true) ||
-                    (product.barcode?.contains(searchQuery, ignoreCase = true) == true)
+            val matchQuery = searchQuery.isBlank() || product.name.contains(searchQuery, true) || product.barcode?.contains(searchQuery, true) == true
             matchCat && matchLowStock && matchQuery
         }
     }
 
     Scaffold(
+        containerColor = SleekBackground,
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = onAddProductClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = SleekBluePrimary,
+                contentColor = Color.White,
+                shape = SiraPillShape,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 5.dp),
                 modifier = Modifier.testTag("fab_add_product")
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Ajouter Produit")
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(19.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Ajouter un produit", fontWeight = FontWeight.SemiBold)
             }
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .testTag("inventory_screen")
-        ) {
-            // Top Search and Low stock toggle
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Filtrer par nom ou code...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
+        Column(Modifier.fillMaxSize().padding(innerPadding).testTag("inventory_screen")) {
+            Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                    Column {
+                        Text("Stock", fontSize = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.7).sp, color = SleekTextPrimary)
+                        Spacer(Modifier.height(3.dp))
+                        Text("${products.size} références • ${products.sumOf { it.quantity }} unités", fontSize = 13.sp, color = SleekTextSecondary)
+                    }
+                    Surface(shape = CircleShape, color = SleekBlueContainer, modifier = Modifier.size(38.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Inventory2, contentDescription = null, tint = SleekBlueOnContainer, modifier = Modifier.size(19.dp)) }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+
+                Surface(
+                    shape = SiraPillShape,
+                    color = SleekSurface,
+                    border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.7f)),
+                    modifier = Modifier.fillMaxWidth().height(46.dp).testTag("stock_search_input")
+                ) {
+                    Row(Modifier.fillMaxSize().padding(horizontal = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = SleekTextSecondary, modifier = Modifier.size(19.dp))
+                        Spacer(Modifier.width(8.dp))
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, color = SleekTextPrimary),
+                            decorationBox = { innerTextField ->
+                                Box {
+                                    if (searchQuery.isBlank()) Text("Rechercher par nom ou code-barres", fontSize = 12.sp, color = SleekTextTertiary)
+                                    innerTextField()
+                                }
+                            }
+                        )
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Effacer")
+                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(30.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = "Effacer", tint = SleekTextTertiary, modifier = Modifier.size(17.dp))
                             }
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().testTag("stock_search_input"),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
-                )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Categories scroll
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
                     items(categories) { cat ->
-                        FilterChip(
-                            selected = selectedCategory == cat && !filterLowStockOnly,
-                            onClick = {
-                                selectedCategory = cat
-                                filterLowStockOnly = false
-                            },
-                            label = { Text(cat, fontSize = 12.sp) }
-                        )
+                        StockChip(cat, selectedCategory == cat && !filterLowStockOnly) {
+                            selectedCategory = cat
+                            filterLowStockOnly = false
+                        }
                     }
-
                     item {
-                        FilterChip(
-                            selected = filterLowStockOnly,
-                            onClick = { filterLowStockOnly = !filterLowStockOnly },
-                            label = { Text("⚠️ Stock Faible", fontSize = 12.sp, color = if (filterLowStockOnly) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface) },
-                            leadingIcon = { Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error) }
-                        )
+                        StockChip("Stock faible", filterLowStockOnly, danger = true) { filterLowStockOnly = !filterLowStockOnly }
                     }
+                }
+                Spacer(Modifier.height(11.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("INVENTAIRE", fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = SleekTextTertiary)
+                    Text("${filteredProducts.size} affichés", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = SleekBluePrimary)
                 }
             }
 
-            // Products Count Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${filteredProducts.size} produit(s) affiché(s)",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Text(
-                    text = "Total unités : ${filteredProducts.sumOf { it.quantity }}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            // Products List
             if (filteredProducts.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "Aucun produit ne correspond aux filtres.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Box(Modifier.fillMaxSize().padding(18.dp), contentAlignment = Alignment.Center) {
+                    Surface(shape = SiraCardShape, color = SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.65f)), modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Surface(shape = CircleShape, color = SleekSurfaceVariant, modifier = Modifier.size(54.dp)) {
+                                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Inventory2, contentDescription = null, tint = SleekTextTertiary, modifier = Modifier.size(25.dp)) }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Text("Aucun produit trouvé", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SleekTextPrimary)
+                            Text("Essayez un autre filtre ou ajoutez une référence.", fontSize = 11.sp, color = SleekTextSecondary)
+                        }
+                    }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 4.dp + 82.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
                     items(filteredProducts, key = { it.id }) { product ->
                         ProductStockCard(
@@ -172,6 +164,19 @@ fun InventoryScreen(
 }
 
 @Composable
+private fun StockChip(label: String, selected: Boolean, danger: Boolean = false, onClick: () -> Unit) {
+    val accent = if (danger) SleekError else SleekBluePrimary
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium) },
+        shape = SiraPillShape,
+        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = accent.copy(alpha = 0.11f), selectedLabelColor = accent, containerColor = SleekSurface),
+        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = selected, borderColor = SleekOutline.copy(alpha = 0.62f), selectedBorderColor = accent.copy(alpha = 0.24f))
+    )
+}
+
+@Composable
 private fun ProductStockCard(
     product: Product,
     numberFormat: NumberFormat,
@@ -181,165 +186,77 @@ private fun ProductStockCard(
     onDelete: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val accent = if (product.isLowStock) SleekError else SleekBluePrimary
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (product.isLowStock) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-        ),
-        tonalElevation = 1.dp,
+        shape = SiraCardShape,
+        color = SleekSurface,
+        border = BorderStroke(1.dp, if (product.isLowStock) SleekError.copy(alpha = 0.28f) else SleekOutline.copy(alpha = 0.62f)),
+        shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Title and category
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = product.name,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Text(
-                        text = product.category,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        Column(Modifier.padding(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(13.dp), color = accent.copy(alpha = 0.09f), modifier = Modifier.size(42.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Inventory2, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp)) }
                 }
-
-                // Options menu
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(product.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = SleekTextPrimary, maxLines = 1)
+                    Text(product.category, fontSize = 10.sp, color = SleekTextSecondary)
+                }
                 Box {
-                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Options", modifier = Modifier.size(18.dp))
+                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(30.dp)) {
+                        Icon(Icons.Default.MoreHoriz, contentDescription = "Options", tint = SleekTextTertiary, modifier = Modifier.size(19.dp))
                     }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Modifier") },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                            onClick = {
-                                showMenu = false
-                                onEdit()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Supprimer", color = MaterialTheme.colorScheme.error) },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                            onClick = {
-                                showMenu = false
-                                onDelete()
-                            }
-                        )
+                        DropdownMenuItem(text = { Text("Modifier") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { showMenu = false; onEdit() })
+                        DropdownMenuItem(text = { Text("Supprimer", color = SleekError) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = SleekError) }, onClick = { showMenu = false; onDelete() })
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Price Details
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Column {
-                        Text("Prix d'achat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("${numberFormat.format(product.purchasePrice.toLong())} F", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                    }
-                    Column {
-                        Text("Prix de vente", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("${numberFormat.format(product.salePrice.toLong())} F", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    }
-                    Column {
-                        Text("Marge", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        val m = product.salePrice - product.purchasePrice
-                        Text("+${numberFormat.format(m.toLong())} F", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = Color(0xFF16A34A))
-                    }
-                }
-
-                // Low stock badge
-                if (product.isLowStock) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.errorContainer
-                    ) {
-                        Text(
-                            text = if (product.quantity == 0) "RUPTURE" else "ALERTE",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StockValue("Achat", "${numberFormat.format(product.purchasePrice.toLong())} F", Modifier.weight(1f))
+                StockValue("Vente", "${numberFormat.format(product.salePrice.toLong())} F", Modifier.weight(1f), SleekBluePrimary)
+                StockValue("Marge", "+${numberFormat.format((product.salePrice - product.purchasePrice).toLong())} F", Modifier.weight(1f), SleekSuccess)
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Quick Stock Control Stepper (« + » pour ravitaillement, « − » après chaque vente)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Quantité en stock :",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Minus Button (Vente directe rapide)
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = SleekOutline.copy(alpha = 0.55f))
+            Spacer(Modifier.height(9.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("Quantité disponible", fontSize = 10.sp, color = SleekTextTertiary)
+                    Text(if (product.isLowStock) "Niveau à surveiller" else "Stock normal", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (product.isLowStock) SleekError else SleekSuccess)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     FilledIconButton(
                         onClick = onDecrement,
                         enabled = product.quantity > 0,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        ),
-                        modifier = Modifier.size(36.dp).testTag("btn_stock_minus_${product.id}")
-                    ) {
-                        Icon(Icons.Default.Remove, contentDescription = "Vente rapide (-1)", modifier = Modifier.size(20.dp))
+                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = SleekErrorContainer, contentColor = SleekError),
+                        modifier = Modifier.size(34.dp).testTag("btn_stock_minus_${product.id}")
+                    ) { Icon(Icons.Default.Remove, contentDescription = "Vente rapide (-1)", modifier = Modifier.size(18.dp)) }
+                    Surface(shape = SiraPillShape, color = if (product.isLowStock) SleekError.copy(alpha = 0.08f) else SleekSurfaceVariant, modifier = Modifier.widthIn(min = 48.dp)) {
+                        Text(product.quantity.toString(), fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, color = if (product.isLowStock) SleekError else SleekTextPrimary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                     }
-
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.widthIn(min = 40.dp)
-                    ) {
-                        Text(
-                            text = product.quantity.toString(),
-                            fontWeight = FontWeight.Black,
-                            fontSize = 16.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = if (product.isLowStock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    // Plus Button (Ravitaillement rapide)
                     FilledIconButton(
                         onClick = onIncrement,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ),
-                        modifier = Modifier.size(36.dp).testTag("btn_stock_plus_${product.id}")
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Ravitaillement rapide (+1)", modifier = Modifier.size(20.dp))
-                    }
+                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = SleekBlueContainer, contentColor = SleekBlueOnContainer),
+                        modifier = Modifier.size(34.dp).testTag("btn_stock_plus_${product.id}")
+                    ) { Icon(Icons.Default.Add, contentDescription = "Ravitaillement rapide (+1)", modifier = Modifier.size(18.dp)) }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StockValue(label: String, value: String, modifier: Modifier, valueColor: Color = SleekTextPrimary) {
+    Column(modifier) {
+        Text(label, fontSize = 9.sp, color = SleekTextTertiary)
+        Spacer(Modifier.height(2.dp))
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = valueColor, maxLines = 1)
     }
 }

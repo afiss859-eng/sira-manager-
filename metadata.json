@@ -1,0 +1,7 @@
+{
+  "name": "SIRA Business",
+  "description": "Gestion complète de commerce et caisse pour commerçants du Burkina Faso : stock, ventes, factures, KYC, transferts et IA SIRA.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

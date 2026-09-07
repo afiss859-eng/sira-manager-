@@ -19,6 +19,7 @@ import com.example.engine.PaymentManager
 import com.example.ocr.OcrScanResult
 import com.example.ocr.SiraOcrEngine
 import com.example.printer.SiraBluetoothPrinter
+import com.example.printer.SiraPrintQueue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -46,11 +47,14 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     val paymentManager = PaymentManager()
     private val aiService = SiraAiService()
     private val bluetoothPrinter = SiraBluetoothPrinter(application)
+    private val printQueue = SiraPrintQueue(application)
 
     private val _printStatus = MutableStateFlow<String?>(null)
     val printStatus: StateFlow<String?> = _printStatus.asStateFlow()
     private val _defaultPrinterMac = MutableStateFlow(bluetoothPrinter.getDefaultPrinterMac())
     val defaultPrinterMac: StateFlow<String?> = _defaultPrinterMac.asStateFlow()
+    private val _pendingPrintCount = MutableStateFlow(printQueue.pendingCount())
+    val pendingPrintCount: StateFlow<Int> = _pendingPrintCount.asStateFlow()
 
     private val _currentTab = MutableStateFlow(SiraNavTab.DASHBOARD)
     val currentTab: StateFlow<SiraNavTab> = _currentTab.asStateFlow()
@@ -59,7 +63,10 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     private val _merchantProfile = MutableStateFlow(MerchantProfile(shopName = currentUser.value.shopName, merchantName = currentUser.value.displayName, email = currentUser.value.email, city = currentUser.value.city))
     val merchantProfile: StateFlow<MerchantProfile> = _merchantProfile.asStateFlow()
 
-    init { webServer.start(8080) }
+    init {
+        webServer.start(8080)
+        retryPendingReceiptPrints()
+    }
     override fun onCleared() { super.onCleared(); webServer.stop() }
 
     fun switchUser(user: SiraAuthUser) {
@@ -110,13 +117,36 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
         bluetoothPrinter.setDefaultPrinter(macAddress)
         _defaultPrinterMac.value = bluetoothPrinter.getDefaultPrinterMac()
         _printStatus.value = "Imprimante configurée : $macAddress"
+        retryPendingReceiptPrints()
     }
     fun clearPrintStatus() { _printStatus.value = null }
+
     private fun enqueueReceiptPrint(sale: Sale, items: List<SaleItem>) {
+        printQueue.enqueue(sale, items)
+        _pendingPrintCount.value = printQueue.pendingCount()
+        retryPendingReceiptPrints()
+    }
+
+    fun retryPendingReceiptPrints() {
         viewModelScope.launch(Dispatchers.IO) {
-            _printStatus.value = "Impression du reçu…"
-            val result = bluetoothPrinter.printSale(sale, items)
-            _printStatus.value = result.fold({ "Reçu imprimé automatiquement" }, { "Impression non effectuée : ${it.message ?: "erreur inconnue"}" })
+            val pending = printQueue.takeAll()
+            if (pending.isEmpty()) {
+                _pendingPrintCount.value = 0
+                return@launch
+            }
+            _printStatus.value = "Tentative d'impression de ${pending.size} reçu(s)…"
+            val remaining = mutableListOf<Pair<Sale, List<SaleItem>>>()
+            for (receipt in pending) {
+                val result = bluetoothPrinter.printSale(receipt.first, receipt.second)
+                if (result.isFailure) remaining += receipt
+            }
+            printQueue.replace(remaining)
+            _pendingPrintCount.value = remaining.size
+            _printStatus.value = if (remaining.isEmpty()) {
+                "Reçu(s) imprimé(s) automatiquement"
+            } else {
+                "${remaining.size} reçu(s) en attente d'impression"
+            }
         }
     }
 

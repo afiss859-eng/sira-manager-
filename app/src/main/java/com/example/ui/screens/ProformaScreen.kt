@@ -5,11 +5,8 @@ import android.graphics.pdf.PdfDocument
 import android.os.Environment
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -23,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.DetailLevelSlider
 import com.example.ui.theme.*
 import com.example.viewmodel.MerchantProfile
 import java.io.File
@@ -37,6 +35,10 @@ private data class ProformaLine(var name: String = "", var qty: Double = 1.0, va
 fun ProformaScreen(profile: MerchantProfile) {
     val context = LocalContext.current
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.FRENCH) }
+    val prefs = remember { context.getSharedPreferences("sira_display_preferences", Context.MODE_PRIVATE) }
+    var detailLevel by remember { mutableFloatStateOf(prefs.getFloat("proforma_detail_level", 0.34f)) }
+    val showAdvanced = detailLevel >= 0.67f
+    val showStandard = detailLevel >= 0.34f
     var client by remember { mutableStateOf("") }
     var clientPhone by remember { mutableStateOf("") }
     var validity by remember { mutableStateOf("7") }
@@ -56,7 +58,7 @@ fun ProformaScreen(profile: MerchantProfile) {
         containerColor = SleekBackground,
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { exportProformaPdf(context, profile, client, clientPhone, validity, reference, lines, subtotal, discountValue, taxValue, total, notes) },
+                onClick = { exportProformaPdf(context, profile, client, clientPhone, validity, reference, lines, subtotal, discountValue, taxValue, total, notes, showAdvanced) },
                 containerColor = SleekBluePrimary,
                 contentColor = Color.White,
                 shape = SiraPillShape
@@ -79,13 +81,26 @@ fun ProformaScreen(profile: MerchantProfile) {
             item {
                 Card(border = BorderStroke(1.dp, SleekOutline), colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = SiraCardShape) {
                     Column(Modifier.padding(16.dp)) {
+                        DetailLevelSlider(
+                            value = detailLevel,
+                            onValueChange = {
+                                detailLevel = it
+                                prefs.edit().putFloat("proforma_detail_level", it).apply()
+                            }
+                        )
+                    }
+                }
+            }
+            item {
+                Card(border = BorderStroke(1.dp, SleekOutline), colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = SiraCardShape) {
+                    Column(Modifier.padding(16.dp)) {
                         Text("Votre commerce", fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(6.dp))
                         Text(profile.shopName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         Text("${profile.merchantName} • ${profile.city}", fontSize = 11.sp, color = SleekTextSecondary)
-                        Text(profile.phone, fontSize = 11.sp, color = SleekTextSecondary)
-                        if (profile.ifuNumber.isNotBlank()) Text("IFU : ${profile.ifuNumber}", fontSize = 10.sp, color = SleekTextTertiary)
-                        if (profile.rccmNumber.isNotBlank()) Text("RCCM : ${profile.rccmNumber}", fontSize = 10.sp, color = SleekTextTertiary)
+                        if (showStandard) Text(profile.phone, fontSize = 11.sp, color = SleekTextSecondary)
+                        if (showAdvanced && profile.ifuNumber.isNotBlank()) Text("IFU : ${profile.ifuNumber}", fontSize = 10.sp, color = SleekTextTertiary)
+                        if (showAdvanced && profile.rccmNumber.isNotBlank()) Text("RCCM : ${profile.rccmNumber}", fontSize = 10.sp, color = SleekTextTertiary)
                     }
                 }
             }
@@ -94,8 +109,8 @@ fun ProformaScreen(profile: MerchantProfile) {
                     Column(Modifier.padding(16.dp)) {
                         Text("Client", fontWeight = FontWeight.Bold)
                         SiraField("Nom / entreprise", client) { client = it }
-                        SiraField("Téléphone", clientPhone) { clientPhone = it }
-                        SiraField("Validité (jours)", validity) { validity = it }
+                        if (showStandard) SiraField("Téléphone", clientPhone) { clientPhone = it }
+                        if (showAdvanced) SiraField("Validité (jours)", validity) { validity = it }
                     }
                 }
             }
@@ -120,28 +135,40 @@ fun ProformaScreen(profile: MerchantProfile) {
                     }
                 }
             }
-            item {
-                Card(border = BorderStroke(1.dp, SleekOutline), colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = SiraCardShape) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Tarification", fontWeight = FontWeight.Bold)
-                        SiraField("Remise (FCFA)", discount) { discount = it }
-                        SiraField("Taxe (%)", tax) { tax = it }
-                        Spacer(Modifier.height(8.dp))
-                        SummaryLine("Sous-total", numberFormat.format(subtotal) + " FCFA")
-                        SummaryLine("Remise", "- ${numberFormat.format(discountValue)} FCFA")
-                        SummaryLine("Taxes", numberFormat.format(taxValue) + " FCFA")
-                        HorizontalDivider(Modifier.padding(vertical = 7.dp))
-                        SummaryLine("TOTAL", numberFormat.format(total) + " FCFA", true)
+            if (showStandard) {
+                item {
+                    Card(border = BorderStroke(1.dp, SleekOutline), colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = SiraCardShape) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Tarification", fontWeight = FontWeight.Bold)
+                            SiraField("Remise (FCFA)", discount) { discount = it }
+                            SiraField("Taxe (%)", tax) { tax = it }
+                            Spacer(Modifier.height(8.dp))
+                            SummaryLine("Sous-total", numberFormat.format(subtotal) + " FCFA")
+                            SummaryLine("Remise", "- ${numberFormat.format(discountValue)} FCFA")
+                            SummaryLine("Taxes", numberFormat.format(taxValue) + " FCFA")
+                            HorizontalDivider(Modifier.padding(vertical = 7.dp))
+                            SummaryLine("TOTAL", numberFormat.format(total) + " FCFA", true)
+                        }
+                    }
+                }
+            } else {
+                item {
+                    Card(border = BorderStroke(1.dp, SleekOutline), colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = SiraCardShape) {
+                        Column(Modifier.padding(16.dp)) {
+                            SummaryLine("TOTAL", numberFormat.format(total) + " FCFA", true)
+                        }
                     }
                 }
             }
-            item {
-                Card(border = BorderStroke(1.dp, SleekOutline), colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = SiraCardShape) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Conditions", fontWeight = FontWeight.Bold)
-                        SiraField("Notes et conditions", notes, singleLine = false) { notes = it }
-                        Spacer(Modifier.height(5.dp))
-                        Text("Référence : $reference", fontSize = 10.sp, color = SleekTextTertiary)
+            if (showAdvanced) {
+                item {
+                    Card(border = BorderStroke(1.dp, SleekOutline), colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = SiraCardShape) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Conditions", fontWeight = FontWeight.Bold)
+                            SiraField("Notes et conditions", notes, singleLine = false) { notes = it }
+                            Spacer(Modifier.height(5.dp))
+                            Text("Référence : $reference", fontSize = 10.sp, color = SleekTextTertiary)
+                        }
                     }
                 }
             }
@@ -162,7 +189,7 @@ private fun SummaryLine(label: String, value: String, strong: Boolean = false) {
     }
 }
 
-private fun exportProformaPdf(context: Context, profile: MerchantProfile, client: String, clientPhone: String, validity: String, reference: String, lines: List<ProformaLine>, subtotal: Double, discount: Double, tax: Double, total: Double, notes: String) {
+private fun exportProformaPdf(context: Context, profile: MerchantProfile, client: String, clientPhone: String, validity: String, reference: String, lines: List<ProformaLine>, subtotal: Double, discount: Double, tax: Double, total: Double, notes: String, showAdvanced: Boolean) {
     try {
         val pdf = PdfDocument()
         val page = pdf.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
@@ -177,21 +204,25 @@ private fun exportProformaPdf(context: Context, profile: MerchantProfile, client
         c.drawText("Émise le ${SimpleDateFormat("dd/MM/yyyy", Locale.FRENCH).format(Date())}", 410f, 87f, p)
         c.drawText("Valable $validity jour(s)", 410f, 102f, p)
         c.drawText("${profile.merchantName} • ${profile.city} • ${profile.phone}", 42f, 78f, p)
-        c.drawText("IFU: ${profile.ifuNumber}   RCCM: ${profile.rccmNumber}", 42f, 94f, p)
-        c.drawText("CLIENT", 42f, 140f, p); c.drawText(client.ifBlank { "Client" }, 42f, 158f, p); c.drawText(clientPhone, 42f, 174f, p)
+        if (showAdvanced) c.drawText("IFU: ${profile.ifuNumber}   RCCM: ${profile.rccmNumber}", 42f, 94f, p)
+        c.drawText("CLIENT", 42f, 140f, p); c.drawText(client.ifBlank { "Client" }, 42f, 158f, p)
+        if (clientPhone.isNotBlank()) c.drawText(clientPhone, 42f, 174f, p)
         var y = 215f
         p.isFakeBoldText = true
         c.drawText("DÉSIGNATION", 42f, y, p); c.drawText("QTÉ", 350f, y, p); c.drawText("PRIX", 410f, y, p); c.drawText("MONTANT", 485f, y, p)
         p.isFakeBoldText = false; y += 18f
         val fmt = NumberFormat.getIntegerInstance(Locale.FRENCH)
-        lines.filter { it.name.isNotBlank() || it.price > 0 }.forEach { l ->
+        lines.filter { it.name.isNotBlank() || it.price > 0 }.take(25).forEach { l ->
             val amount = l.qty * l.price
             c.drawText(l.name.take(38), 42f, y, p); c.drawText(fmt.format(l.qty), 350f, y, p); c.drawText(fmt.format(l.price), 410f, y, p); c.drawText(fmt.format(amount), 485f, y, p); y += 20f
         }
         y += 12f; c.drawText("Sous-total : ${fmt.format(subtotal)} FCFA", 380f, y, p); y += 18f; c.drawText("Remise : - ${fmt.format(discount)} FCFA", 380f, y, p); y += 18f; c.drawText("Taxes : ${fmt.format(tax)} FCFA", 380f, y, p); y += 24f
         p.isFakeBoldText = true; p.textSize = 15f; c.drawText("TOTAL : ${fmt.format(total)} FCFA", 360f, y, p)
-        p.isFakeBoldText = false; p.textSize = 10f; y += 44f; c.drawText("Conditions", 42f, y, p); y += 16f
-        notes.lines().take(6).forEach { line -> c.drawText(line.take(95), 42f, y, p); y += 14f }
+        p.isFakeBoldText = false; p.textSize = 10f
+        if (showAdvanced) {
+            y += 44f; c.drawText("Conditions", 42f, y, p); y += 16f
+            notes.lines().take(6).forEach { line -> c.drawText(line.take(95), 42f, y, p); y += 14f }
+        }
         y = 780f; c.drawText("Le commerçant", 70f, y, p); c.drawText("Le client", 420f, y, p)
         c.drawText("SIRA — Chemin d’aujourd’hui, avenir de demain", 170f, 825f, p)
         pdf.finishPage(page)

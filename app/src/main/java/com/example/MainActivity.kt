@@ -1,5 +1,6 @@
 package com.example
 
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,7 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -35,6 +38,10 @@ import com.example.ui.screens.*
 import com.example.ui.theme.*
 import com.example.viewmodel.SiraNavTab
 import com.example.viewmodel.SiraViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : ComponentActivity() {
     private val viewModel: SiraViewModel by viewModels()
@@ -62,6 +69,7 @@ class MainActivity : ComponentActivity() {
                     val customers by viewModel.customers.collectAsState()
                     val currentEngine by viewModel.paymentManager.currentEngine.collectAsState()
                     val isSyncing by viewModel.isSyncing.collectAsState()
+                    val accent = remember(licenseConfig.themeColorHex) { parseThemeColor(licenseConfig.themeColorHex) }
 
                     var showGlobalSearch by remember { mutableStateOf(false) }
                     var showNewSaleDialog by remember { mutableStateOf(false) }
@@ -90,11 +98,11 @@ class MainActivity : ComponentActivity() {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Image(
-                                            painter = painterResource(id = R.drawable.sira_logo),
-                                            contentDescription = "Logo Officiel SIRA",
-                                            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)),
-                                            contentScale = ContentScale.Crop
+                                        LicensedImage(
+                                            url = licenseConfig.logoUrl,
+                                            fallbackRes = R.drawable.sira_logo,
+                                            contentDescription = "Logo de l'organisation",
+                                            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(12.dp))
                                         )
                                         Spacer(Modifier.width(10.dp))
                                         Column {
@@ -106,8 +114,8 @@ class MainActivity : ComponentActivity() {
                                                 color = SleekTextPrimary
                                             )
                                             Text(
-                                                text = "${profile.shopName} • ${profile.city}",
-                                                fontSize = 11.sp,
+                                                text = "${profile.shopName} • ${profile.city} • ${licenseConfig.stockModel}",
+                                                fontSize = 10.sp,
                                                 color = SleekTextSecondary
                                             )
                                         }
@@ -119,22 +127,20 @@ class MainActivity : ComponentActivity() {
                                         }
                                         IconButton(onClick = { viewModel.performCloudSync() }, modifier = Modifier.size(36.dp).testTag("top_bar_sync_button")) {
                                             if (isSyncing) {
-                                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = SleekBluePrimary)
+                                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = accent)
                                             } else {
-                                                Icon(Icons.Default.CloudSync, contentDescription = "Synchro Cloud", tint = SleekBluePrimary, modifier = Modifier.size(20.dp))
+                                                Icon(Icons.Default.CloudSync, contentDescription = "Synchro Cloud", tint = accent, modifier = Modifier.size(20.dp))
                                             }
                                         }
                                         Spacer(Modifier.width(3.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(if (currentUser.role == SiraRole.SUPER_ADMIN) SleekBluePrimary else SleekSecondary)
-                                                .clickable { showGoogleAuthDialog = true },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(currentUser.displayName.take(2).uppercase(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                        }
+                                        LicensedImage(
+                                            url = licenseConfig.profilePhotoUrl,
+                                            fallbackRes = R.drawable.sira_logo,
+                                            contentDescription = "Profil de l'organisation",
+                                            modifier = Modifier.size(36.dp).clip(CircleShape),
+                                            contentScale = ContentScale.Crop,
+                                            fallbackTint = if (currentUser.role == SiraRole.SUPER_ADMIN) accent else SleekSecondary
+                                        )
                                     }
                                 }
 
@@ -221,83 +227,24 @@ class MainActivity : ComponentActivity() {
                     }
 
                     if (showGlobalSearch) {
-                        GlobalSearchDialog(
-                            viewModel = viewModel,
-                            onDismiss = { showGlobalSearch = false },
-                            onNavigateToTab = { tab ->
-                                viewModel.selectTab(tab)
-                                showGlobalSearch = false
-                            },
-                            onSelectSale = { sale ->
-                                viewModel.showInvoiceForSale(sale)
-                                showGlobalSearch = false
-                            }
-                        )
+                        GlobalSearchDialog(viewModel = viewModel, onDismiss = { showGlobalSearch = false }, onNavigateToTab = { tab -> viewModel.selectTab(tab); showGlobalSearch = false }, onSelectSale = { sale -> viewModel.showInvoiceForSale(sale); showGlobalSearch = false })
                     }
-
                     if (showNewSaleDialog) {
-                        NewSaleDialog(
-                            products = products,
-                            customers = customers,
-                            currentPaymentEngine = currentEngine,
-                            onDismiss = { showNewSaleDialog = false },
-                            onCompleteSale = { sale, items ->
-                                viewModel.completeSale(sale, items)
-                                showNewSaleDialog = false
-                            }
-                        )
+                        NewSaleDialog(products = products, customers = customers, currentPaymentEngine = currentEngine, onDismiss = { showNewSaleDialog = false }, onCompleteSale = { sale, items -> viewModel.completeSale(sale, items); showNewSaleDialog = false })
                     }
-
                     if (showAddEditProductDialog) {
-                        AddEditProductDialog(
-                            initialProduct = productToEdit,
-                            onDismiss = { showAddEditProductDialog = false },
-                            onSave = { product ->
-                                viewModel.saveProduct(product)
-                                showAddEditProductDialog = false
-                            }
-                        )
+                        AddEditProductDialog(initialProduct = productToEdit, onDismiss = { showAddEditProductDialog = false }, onSave = { product -> viewModel.saveProduct(product); showAddEditProductDialog = false })
                     }
-
                     if (showKycCustomerDialog) {
-                        KycCustomerDialog(
-                            initialCustomer = customerToEdit,
-                            viewModel = viewModel,
-                            onDismiss = { showKycCustomerDialog = false },
-                            onSave = { customer ->
-                                viewModel.saveCustomer(customer)
-                                showKycCustomerDialog = false
-                            }
-                        )
+                        KycCustomerDialog(initialCustomer = customerToEdit, viewModel = viewModel, onDismiss = { showKycCustomerDialog = false }, onSave = { customer -> viewModel.saveCustomer(customer); showKycCustomerDialog = false })
                     }
-
                     if (showCashOpDialog) {
-                        CashOperationDialog(
-                            onDismiss = { showCashOpDialog = false },
-                            onSave = { tx ->
-                                viewModel.recordCashOp(tx)
-                                showCashOpDialog = false
-                            }
-                        )
+                        CashOperationDialog(onDismiss = { showCashOpDialog = false }, onSave = { tx -> viewModel.recordCashOp(tx); showCashOpDialog = false })
                     }
-
-                    lastInvoice?.let { (sale, items) ->
-                        ReceiptDialog(
-                            sale = sale,
-                            items = items,
-                            profile = profile,
-                            onDismiss = { viewModel.closeInvoiceDialog() }
-                        )
-                    }
-
+                    lastInvoice?.let { (sale, items) -> ReceiptDialog(sale = sale, items = items, profile = profile, onDismiss = { viewModel.closeInvoiceDialog() }) }
                     if (showGoogleAuthDialog) {
-                        GoogleAuthDialog(
-                            authManager = viewModel.authManager,
-                            onDismiss = { showGoogleAuthDialog = false },
-                            onUserSwitched = { newUser -> viewModel.switchUser(newUser) }
-                        )
+                        GoogleAuthDialog(authManager = viewModel.authManager, onDismiss = { showGoogleAuthDialog = false }, onUserSwitched = { newUser -> viewModel.switchUser(newUser) })
                     }
-
                     if (showTermsDialog) {
                         TermsAndPrivacyDialog(onDismiss = { showTermsDialog = false })
                     }
@@ -308,10 +255,39 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun SiraBottomDock(
-    currentTab: SiraNavTab,
-    onTabSelected: (SiraNavTab) -> Unit
+private fun LicensedImage(
+    url: String,
+    fallbackRes: Int,
+    contentDescription: String?,
+    modifier: Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    fallbackTint: Color = SleekBluePrimary
 ) {
+    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = url) {
+        value = if (url.isBlank()) null else withContext(Dispatchers.IO) {
+            runCatching {
+                val conn = URL(url).openConnection() as HttpURLConnection
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                conn.doInput = true
+                conn.inputStream.use { BitmapFactory.decodeStream(it) }
+                    .also { conn.disconnect() }
+            }.getOrNull()
+        }
+    }
+    if (bitmap != null) {
+        Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = contentDescription, modifier = modifier, contentScale = contentScale)
+    } else {
+        Box(modifier = modifier.background(fallbackTint, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+            Image(painter = painterResource(id = fallbackRes), contentDescription = contentDescription, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), contentScale = contentScale)
+        }
+    }
+}
+
+private fun parseThemeColor(hex: String): Color = runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(SleekBluePrimary)
+
+@Composable
+private fun SiraBottomDock(currentTab: SiraNavTab, onTabSelected: (SiraNavTab) -> Unit) {
     val items = listOf(
         SiraDockItem(SiraNavTab.DASHBOARD, Icons.Default.Home, "Accueil", "nav_dashboard"),
         SiraDockItem(SiraNavTab.STOCK, Icons.Default.Inventory2, "Stock", "nav_stock"),
@@ -321,62 +297,22 @@ private fun SiraBottomDock(
         SiraDockItem(SiraNavTab.INTELLIGENCE, Icons.Default.AutoAwesome, "SIRA IA", "nav_intelligence"),
         SiraDockItem(SiraNavTab.PARAMETRES, Icons.Default.Settings, "Plus", "nav_parametres")
     )
-
-    Surface(
-        color = SleekSurface.copy(alpha = 0.98f),
-        shadowElevation = 6.dp,
-        tonalElevation = 0.dp,
-        border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.72f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 7.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    Surface(color = SleekSurface.copy(alpha = 0.98f), shadowElevation = 6.dp, tonalElevation = 0.dp, border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.72f)), modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 7.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
             items.forEach { item ->
                 val selected = currentTab == item.tab
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag(item.tag)
-                        .clickable { onTabSelected(item.tab) },
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Surface(
-                        shape = SiraPillShape,
-                        color = if (selected) SleekBlueContainer else Color.Transparent,
-                        modifier = Modifier.height(32.dp).fillMaxWidth()
-                    ) {
+                Column(modifier = Modifier.weight(1f).testTag(item.tag).clickable { onTabSelected(item.tab) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(shape = SiraPillShape, color = if (selected) SleekBlueContainer else Color.Transparent, modifier = Modifier.height(32.dp).fillMaxWidth()) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                item.icon,
-                                contentDescription = item.label,
-                                tint = if (selected) SleekBlueOnContainer else SleekTextTertiary,
-                                modifier = Modifier.size(if (selected) 20.dp else 19.dp)
-                            )
+                            Icon(item.icon, contentDescription = item.label, tint = if (selected) SleekBlueOnContainer else SleekTextTertiary, modifier = Modifier.size(if (selected) 20.dp else 19.dp))
                         }
                     }
                     Spacer(Modifier.height(2.dp))
-                    Text(
-                        item.label,
-                        fontSize = 8.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (selected) SleekBlueOnContainer else SleekTextTertiary,
-                        maxLines = 1
-                    )
+                    Text(item.label, fontSize = 8.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, color = if (selected) SleekBlueOnContainer else SleekTextTertiary, maxLines = 1)
                 }
             }
         }
     }
 }
 
-private data class SiraDockItem(
-    val tab: SiraNavTab,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val label: String,
-    val tag: String
-)
+private data class SiraDockItem(val tab: SiraNavTab, val icon: androidx.compose.ui.graphics.vector.ImageVector, val label: String, val tag: String)

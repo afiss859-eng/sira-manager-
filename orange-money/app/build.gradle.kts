@@ -4,8 +4,19 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-android { namespace = "com.example.siraorangemoney"; compileSdk = 35
-    defaultConfig { applicationId = "com.sira.orangemoney"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "1.0" }
+android {
+    namespace = "com.sira.orangemoney"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.sira.orangemoney"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 1
+        versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
     buildFeatures { compose = true }
 }
 
@@ -16,4 +27,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+
+    testImplementation("org.jetbrains.kotlin:kotlin-test")
 }

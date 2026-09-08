@@ -202,20 +202,34 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     fun askAiMerchantQuery(query: String) {
         viewModelScope.launch {
             _isAiLoading.value = true
-            val context = mapOf(
-                "shopName" to merchantProfile.value.shopName,
-                "productCount" to products.value.size,
-                "lowStockCount" to lowStockProducts.value.size,
-                "salesCount" to sales.value.size,
-                "salesRevenue" to sales.value.sumOf { it.totalAmount },
-                "salesProfit" to sales.value.sumOf { it.profitAmount },
-                "customerCount" to customers.value.size,
-                "supplierCount" to suppliers.value.size,
-                "cashTransactionCount" to cashTransactions.value.size,
-                "orangeMoneyToday" to getOrangeMoneyDailyStats().first
-            )
-            val cloud = cloudCopilot.ask(query, context)
-            _aiInteractiveAnswer.value = cloud.getOrElse { aiService.answerMerchantQuery(query, cashTransactions.value, sales.value) }
+
+            // SOURCE DE VÉRITÉ : la base SQLite locale du commerçant actif.
+            // Le copilote local lit directement le repository Room associé à cette base.
+            val localResult = SiraLocalCopilot(_repository.value).answer(query)
+            if (localResult.isSuccess) {
+                _aiInteractiveAnswer.value = localResult.getOrThrow()
+            } else {
+                _aiInteractiveAnswer.value = aiService.answerMerchantQuery(query, cashTransactions.value, sales.value)
+            }
+
+            // Le cloud n'est qu'une amélioration facultative pour les questions que le moteur local ne comprend pas.
+            // Aucune dépendance réseau n'est nécessaire pour le fonctionnement métier hors ligne.
+            if (localResult.isFailure && licenseConfig.value.isActivated) {
+                val context = mapOf(
+                    "shopName" to merchantProfile.value.shopName,
+                    "productCount" to products.value.size,
+                    "lowStockCount" to lowStockProducts.value.size,
+                    "salesCount" to sales.value.size,
+                    "salesRevenue" to sales.value.sumOf { it.totalAmount },
+                    "salesProfit" to sales.value.sumOf { it.profitAmount },
+                    "customerCount" to customers.value.size,
+                    "supplierCount" to suppliers.value.size,
+                    "cashTransactionCount" to cashTransactions.value.size,
+                    "orangeMoneyToday" to getOrangeMoneyDailyStats().first
+                )
+                val cloud = cloudCopilot.ask(query, context)
+                if (cloud.isSuccess) _aiInteractiveAnswer.value = cloud.getOrThrow()
+            }
             _isAiLoading.value = false
         }
     }

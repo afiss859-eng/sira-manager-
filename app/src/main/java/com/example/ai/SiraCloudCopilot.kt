@@ -11,9 +11,17 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 
-/** Cloud SIRA Copilot. The provider secret is never stored in the APK. */
+/**
+ * Copilote SIRA hybride : local d'abord, cloud ensuite.
+ * La base locale reste la source de vérité et permet au commerçant de continuer hors ligne.
+ */
 class SiraCloudCopilot(private val licenseManager: LicenseManager) {
+    private val offlineCopilot = SiraOfflineCopilot()
+
     suspend fun ask(query: String, context: Map<String, Any?> = emptyMap()): Result<String> = withContext(Dispatchers.IO) {
+        val local = offlineCopilot.answerFromContext(query, context)
+        if (local != null) return@withContext Result.success(local)
+
         val license = licenseManager.licenseConfig.value
         if (!license.isActivated || license.isRevoked || license.key.isBlank()) {
             return@withContext Result.failure(IllegalStateException("Licence SIRA inactive."))

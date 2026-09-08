@@ -11,7 +11,7 @@ import java.util.Locale
 /**
  * Offline SIRA Copilot.
  * Reads the merchant's current local SQLite database directly through SiraRepository.
- * No network, API key or cloud service is required.
+ * No network, API key or cloud service is required for supported business questions.
  */
 class SiraLocalCopilot(private val repository: SiraRepository) {
     suspend fun answer(query: String): Result<String> = withContext(Dispatchers.IO) {
@@ -21,7 +21,6 @@ class SiraLocalCopilot(private val repository: SiraRepository) {
         val products = repository.allProducts.first()
         val lowStock = repository.lowStockProducts.first()
         val sales = repository.allSales.first()
-        val saleItems = repository.allSaleItems.first()
         val customers = repository.allCustomers.first()
         val suppliers = repository.allSuppliers.first()
         val cash = repository.allCashTransactions.first()
@@ -44,45 +43,37 @@ class SiraLocalCopilot(private val repository: SiraRepository) {
                     "📦 Votre base locale SIRA contient ${products.size} produit(s), dont ${lowStock.size} en stock faible. Valeur d'achat estimée du stock : ${fcfa(stockValue)}."
                 )
             }
-
             hasAny(q, "rupture", "stock faible", "manque", "bientôt vide", "bientot vide") -> {
                 if (lowStock.isEmpty()) return@withContext Result.success("✅ Aucun produit n'est actuellement signalé en stock faible dans la base locale SIRA.")
                 val top = lowStock.take(8).joinToString("\n") { "• ${it.name} : ${it.quantity} unité(s)" }
                 return@withContext Result.success("🔴 Produits à surveiller localement :\n$top")
             }
-
             hasAny(q, "orange money", "orange") && hasAny(q, "bénéfice", "benefice", "commission", "gain") -> {
                 return@withContext Result.success(
                     "🟠 Aujourd'hui, SIRA a calculé ${fcfa(orangeCommission)} de commissions Orange Money sur ${orangeToday.size} opération(s). Calcul effectué directement depuis votre base locale, sans Internet."
                 )
             }
-
             hasAny(q, "chiffre d'affaires", "ca", "vente", "ventes", "revenu") && hasAny(q, "aujourd", "total", "combien", "montant") -> {
                 return@withContext Result.success(
                     "💰 Chiffre d'affaires enregistré dans la base locale : ${fcfa(revenue)} pour ${sales.size} vente(s)."
                 )
             }
-
             hasAny(q, "bénéfice", "benefice", "marge", "profit") -> {
                 return@withContext Result.success(
                     "📈 Bénéfice brut enregistré par SIRA : ${fcfa(profit)}. Ce résultat vient directement des ventes locales enregistrées."
                 )
             }
-
             hasAny(q, "crédit", "credit", "dette", "doivent") -> {
                 return@withContext Result.success(
                     "👥 Encours clients actuel : ${fcfa(credit)} sur ${customers.count { it.creditBalance > 0 }} client(s) ayant un crédit."
                 )
             }
-
             hasAny(q, "client", "clients") && hasAny(q, "combien", "nombre", "total") -> {
                 return@withContext Result.success("👥 ${customers.size} client(s) sont enregistrés localement dans SIRA.")
             }
-
             hasAny(q, "fournisseur", "fournisseurs") && hasAny(q, "combien", "nombre", "total") -> {
                 return@withContext Result.success("🚚 ${suppliers.size} fournisseur(s) sont enregistrés localement dans SIRA.")
             }
-
             hasAny(q, "produit") -> {
                 val match = products.firstOrNull {
                     q.contains(it.name.lowercase(Locale.FRENCH)) ||
@@ -96,9 +87,7 @@ class SiraLocalCopilot(private val repository: SiraRepository) {
             }
         }
 
-        Result.success(
-            "🧠 Je fonctionne hors ligne à partir de votre base locale SIRA. Essayez : « combien de produits ai-je ? », « quels produits sont en rupture ? », « quel est mon bénéfice ? », « combien me doivent mes clients ? » ou « quel est mon bénéfice Orange Money ? »"
-        )
+        Result.failure(UnsupportedOperationException("Question locale non reconnue"))
     }
 
     private fun hasAny(value: String, vararg terms: String): Boolean = terms.any { value.contains(it) }

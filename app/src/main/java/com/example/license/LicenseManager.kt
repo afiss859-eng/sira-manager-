@@ -34,7 +34,8 @@ class LicenseManager private constructor(private val context: Context) {
     private val _licenseConfig = MutableStateFlow(loadSavedLicense())
     val licenseConfig: StateFlow<AppLicenseConfig> = _licenseConfig.asStateFlow()
 
-    val cloudBaseUrl = "https://ais-dev-vnyffmslextjnn7vtodb2q-848224578156.europe-west2.run.app"
+    // SIRA Control Plane deployed on the existing healthy Vercel project.
+    val cloudBaseUrl = "https://sira-website-doma1.vercel.app"
     val localBaseUrl = "http://127.0.0.1:8080"
 
     init {
@@ -44,8 +45,17 @@ class LicenseManager private constructor(private val context: Context) {
             prefs.edit().putString("sira_device_id", did).apply()
         }
         deviceId = did
+
+        // Re-check a previously activated license at startup and then periodically.
+        // A remote suspension/revocation therefore propagates to the APK without requiring a reinstall.
         if (_licenseConfig.value.isActivated && _licenseConfig.value.key.isNotBlank()) {
-            scope.launch { validateKeyOnline(_licenseConfig.value.key) }
+            scope.launch {
+                validateKeyOnline(_licenseConfig.value.key)
+                while (isActive) {
+                    delay(60_000)
+                    if (_licenseConfig.value.key.isNotBlank()) validateKeyOnline(_licenseConfig.value.key)
+                }
+            }
         }
     }
 
@@ -71,7 +81,7 @@ class LicenseManager private constructor(private val context: Context) {
 
     suspend fun activateWithKey(inputKey: String): Result<AppLicenseConfig> = withContext(Dispatchers.IO) {
         val trimmed = inputKey.trim()
-        if (trimmed.isBlank()) return@withContext Result.failure(Exception("Veuillez saisir une clé API valide."))
+        if (trimmed.isBlank()) return@withContext Result.failure(Exception("Veuillez saisir une clé de licence valide."))
         val validation = callValidateEndpoint(trimmed)
         if (validation.optBoolean("valid", false)) {
             val licObj = validation.optJSONObject("license") ?: JSONObject()
@@ -83,7 +93,7 @@ class LicenseManager private constructor(private val context: Context) {
             Result.success(_licenseConfig.value)
         } else {
             val error = validation.optString("error", "Clé de licence invalide ou quota dépassé.")
-            if (validation.optBoolean("revoked", false)) revokeLocally("Cette clé API a été révoquée.")
+            if (validation.optBoolean("revoked", false) || validation.optBoolean("expired", false)) revokeLocally(error)
             Result.failure(Exception(error))
         }
     }
@@ -92,15 +102,30 @@ class LicenseManager private constructor(private val context: Context) {
         try {
             val validation = callValidateEndpoint(keyToTest)
             if (!validation.optBoolean("valid", false)) {
-                if (validation.optBoolean("revoked", false)) revokeLocally("Clé révoquée par l'administrateur.")
+                if (validation.optBoolean("revoked", false) || validation.optBoolean("expired", false)) {
+                    revokeLocally(validation.optString("error", "Licence désactivée à distance."))
+                }
                 return@withContext false
             }
+
             val licObj = validation.optJSONObject("license") ?: JSONObject()
             val keypad = try { KeypadLayoutType.valueOf(licObj.optString("keypadLayout", _licenseConfig.value.keypadLayout.name)) } catch (_: Exception) { _licenseConfig.value.keypadLayout }
             saveToPrefs(keyToTest, true, false, licObj.optString("merchantName", _licenseConfig.value.merchantName), licObj.optString("shopName", _licenseConfig.value.shopName),
                 licObj.optInt("maxUsers", _licenseConfig.value.maxUsers), licObj.optInt("usedCount", _licenseConfig.value.usedCount), licObj.optString("themeColor", _licenseConfig.value.themeColorHex),
                 licObj.optString("appName", _licenseConfig.value.appName), licObj.optString("logoUrl", _licenseConfig.value.logoUrl), licObj.optString("bgUrl", _licenseConfig.value.bgUrl),
                 licObj.optString("cguText", _licenseConfig.value.cguText), licObj.optString("privacyText", _licenseConfig.value.privacyText), keypad)
+
+            // Remote commands are intentionally constrained to safe control actions.
+            val commands = validation.optJSONArray("commands")
+            if (commands != null) {
+                for (i in 0 until commands.length()) {
+                    val command = commands.optJSONObject(i)?.optString("command") ?: continue
+                    if (command == "LOCK_APP") {
+                        revokeLocally("Application verrouillée à distance par l'administrateur.")
+                        return@withContext false
+                    }
+                }
+            }
             true
         } catch (_: Exception) {
             // Offline: preserve the previously validated state; never bypass activation with a master key.
@@ -113,7 +138,7 @@ class LicenseManager private constructor(private val context: Context) {
         if (currentKey.isBlank()) return@withContext Result.failure(Exception("Aucune licence active."))
         saveToPrefs(currentKey, true, false, _licenseConfig.value.merchantName, shopName, _licenseConfig.value.maxUsers, _licenseConfig.value.usedCount, themeColorHex, appName, logoUrl, bgUrl, cguText, privacyText, keypadLayout)
         val payload = JSONObject().apply { put("key", currentKey); put("appName", appName); put("shopName", shopName); put("themeColor", themeColorHex); put("logoUrl", logoUrl); put("bgUrl", bgUrl); put("cguText", cguText); put("privacyText", privacyText); put("keypadLayout", keypadLayout.name); put("deviceId", deviceId) }
-        try { sendPostRequest("$localBaseUrl/api/licenses/customize", payload) } catch (_: Exception) { try { sendPostRequest("$cloudBaseUrl/api/licenses/customize", payload) } catch (_: Exception) {} }
+        try { sendPostRequest("$localBaseUrl/api/licenses/customize", payload) } catch (_: Exception) { }
         Result.success(Unit)
     }
 
@@ -124,7 +149,7 @@ class LicenseManager private constructor(private val context: Context) {
 
     fun resetLicense() {
         prefs.edit().clear().apply()
-        _licenseConfig.value = AppLicenseConfig(isActivated = false, isRevoked = false, statusMessage = "Application en attente d'activation par clé API")
+        _licenseConfig.value = AppLicenseConfig(isActivated = false, isRevoked = false, statusMessage = "Application en attente d'activation par clé de licence")
     }
 
     private fun saveToPrefs(key: String, isActivated: Boolean, isRevoked: Boolean, merchant: String, shop: String, maxUsers: Int, usedCount: Int, color: String, appName: String, logoUrl: String, bgUrl: String, cgu: String, privacy: String, keypad: KeypadLayoutType) {
@@ -135,15 +160,22 @@ class LicenseManager private constructor(private val context: Context) {
     }
 
     private fun callValidateEndpoint(key: String): JSONObject {
-        val payload = JSONObject().apply { put("key", key); put("deviceId", deviceId) }
-        return try { JSONObject(sendPostRequest("$localBaseUrl/api/licenses/validate", payload)) }
-        catch (_: Exception) { try { JSONObject(sendPostRequest("$cloudBaseUrl/api/licenses/validate", payload)) }
-        catch (_: Exception) { JSONObject().apply { put("valid", false); put("error", "Connexion au serveur de licence impossible. Vérifiez votre réseau.") } } }
+        val payload = JSONObject().apply {
+            put("key", key)
+            put("deviceId", deviceId)
+            put("appVersion", "1.0")
+        }
+        return try {
+            JSONObject(sendPostRequest("$cloudBaseUrl/api/licenses/validate", payload))
+        } catch (_: Exception) {
+            try { JSONObject(sendPostRequest("$localBaseUrl/api/licenses/validate", payload)) }
+            catch (_: Exception) { JSONObject().apply { put("valid", false); put("error", "Connexion au serveur de licence impossible. Vérifiez votre réseau.") } }
+        }
     }
 
     private fun sendPostRequest(targetUrl: String, body: JSONObject): String {
         val conn = (URL(targetUrl).openConnection() as HttpURLConnection)
-        conn.requestMethod = "POST"; conn.connectTimeout = 4000; conn.readTimeout = 4000; conn.doOutput = true
+        conn.requestMethod = "POST"; conn.connectTimeout = 5000; conn.readTimeout = 5000; conn.doOutput = true
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8"); conn.setRequestProperty("Accept", "application/json")
         OutputStreamWriter(conn.outputStream, StandardCharsets.UTF_8).use { it.write(body.toString()); it.flush() }
         val code = conn.responseCode

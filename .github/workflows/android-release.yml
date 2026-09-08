@@ -1,0 +1,126 @@
+name: SIRA Android Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (example: 1.2.0)'
+        required: true
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sira-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-release:
+    name: Build, sign and publish both SIRA APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid semantic version: $VERSION" >&2
+            exit 1
+          fi
+          VERSION_CODE=$(echo "$VERSION" | awk -F. '{ printf "%d%02d%02d", $1, $2, $3 }')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Validate signing configuration
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIRA_ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.SIRA_ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.SIRA_ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo 'Missing SIRA_ANDROID_KEYSTORE_BASE64 secret' >&2; exit 1; }
+          test -n "$STORE_PASSWORD" || { echo 'Missing SIRA_ANDROID_STORE_PASSWORD secret' >&2; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo 'Missing SIRA_ANDROID_KEY_PASSWORD secret' >&2; exit 1; }
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/sira-upload-key.jks"
+          test -s "$RUNNER_TEMP/sira-upload-key.jks"
+
+      - name: Test Business
+        run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Test Orange Money
+        working-directory: orange-money
+        run: gradle testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Build Business release
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/sira-upload-key.jks
+          STORE_PASSWORD: ${{ secrets.SIRA_ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.SIRA_ANDROID_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease -PversionCode=${{ steps.version.outputs.version_code }} -PversionName=${{ steps.version.outputs.version }} --no-daemon --stacktrace
+
+      - name: Build Orange Money release
+        working-directory: orange-money
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/sira-upload-key.jks
+          STORE_PASSWORD: ${{ secrets.SIRA_ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.SIRA_ANDROID_KEY_PASSWORD }}
+        run: gradle assembleRelease -PversionCode=${{ steps.version.outputs.version_code }} -PversionName=${{ steps.version.outputs.version }} --no-daemon --stacktrace
+
+      - name: Verify both release APKs
+        shell: bash
+        run: |
+          test -s app/build/outputs/apk/release/app-release.apk
+          test -s orange-money/app/build/outputs/apk/release/app-release.apk
+
+      - name: Rename APKs
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/SIRA-Business-${{ steps.version.outputs.version }}.apk"
+          cp orange-money/app/build/outputs/apk/release/app-release.apk "dist/SIRA-Orange-Money-${{ steps.version.outputs.version }}.apk"
+          sha256sum dist/*.apk > dist/SHA256SUMS.txt
+
+      - name: Ensure tag exists
+        if: github.ref_type != 'tag'
+        run: git tag "v${{ steps.version.outputs.version }}" "${GITHUB_SHA}" && git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: SIRA Manager v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/SIRA-Business-${{ steps.version.outputs.version }}.apk
+            dist/SIRA-Orange-Money-${{ steps.version.outputs.version }}.apk
+            dist/SHA256SUMS.txt

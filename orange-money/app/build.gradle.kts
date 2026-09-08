@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.sira.orangemoney"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.sira.orangemoney"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
         versionName = (project.findProperty("versionName") as String?) ?: "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

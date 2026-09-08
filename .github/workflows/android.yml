@@ -17,6 +17,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  api-license:
+    name: API - license tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: License unit tests
+        env:
+          SIRA_LICENSE_SECRET: ${{ secrets.SIRA_LICENSE_SECRET_TEST }}
+        run: node --test api/licenses/_lib.test.js
+
   business:
     name: SIRA Business - test and build
     runs-on: ubuntu-latest

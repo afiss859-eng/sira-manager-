@@ -46,6 +46,7 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     private val _repository = MutableStateFlow(SiraRepository(_currentDatabase.value))
     val paymentManager = PaymentManager()
     private val aiService = SiraAiService()
+    private val cloudCopilot = SiraCloudCopilot(licenseManager)
     private val bluetoothPrinter = SiraBluetoothPrinter(application)
     private val printQueue = SiraPrintQueue(application)
 
@@ -135,7 +136,7 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             _printStatus.value = "Tentative d'impression de ${pending.size} reçu(s)…"
-            val remaining = mutableListOf<Pair<Sale, List<SaleItem>>>()
+            val remaining = mutableListOf<Pair<Sale, List<SaleItem>>()>()
             for (receipt in pending) {
                 val result = bluetoothPrinter.printSale(receipt.first, receipt.second)
                 if (result.isFailure) remaining += receipt
@@ -198,7 +199,26 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     val isAiLoading: StateFlow<Boolean> = _isAiLoading.asStateFlow()
     private val _aiInteractiveAnswer = MutableStateFlow<String?>(null)
     val aiInteractiveAnswer: StateFlow<String?> = _aiInteractiveAnswer.asStateFlow()
-    fun askAiMerchantQuery(query: String) { viewModelScope.launch { _isAiLoading.value = true; _aiInteractiveAnswer.value = aiService.answerMerchantQuery(query, cashTransactions.value, sales.value); _isAiLoading.value = false } }
+    fun askAiMerchantQuery(query: String) {
+        viewModelScope.launch {
+            _isAiLoading.value = true
+            val context = mapOf(
+                "shopName" to merchantProfile.value.shopName,
+                "productCount" to products.value.size,
+                "lowStockCount" to lowStockProducts.value.size,
+                "salesCount" to sales.value.size,
+                "salesRevenue" to sales.value.sumOf { it.totalAmount },
+                "salesProfit" to sales.value.sumOf { it.profitAmount },
+                "customerCount" to customers.value.size,
+                "supplierCount" to suppliers.value.size,
+                "cashTransactionCount" to cashTransactions.value.size,
+                "orangeMoneyToday" to getOrangeMoneyDailyStats().first
+            )
+            val cloud = cloudCopilot.ask(query, context)
+            _aiInteractiveAnswer.value = cloud.getOrElse { aiService.answerMerchantQuery(query, cashTransactions.value, sales.value) }
+            _isAiLoading.value = false
+        }
+    }
     fun clearAiInteractiveAnswer() { _aiInteractiveAnswer.value = null }
     fun getOrangeMoneyDailyStats(): Triple<Double, Int, Double> = aiService.calculateOrangeMoneyDailyProfit(cashTransactions.value)
     fun runSiraIntelligence() { viewModelScope.launch { _isAiLoading.value = true; _aiReport.value = aiService.generateBusinessReport(products.value, sales.value, saleItems.value, customers.value, cashTransactions.value); _isAiLoading.value = false } }

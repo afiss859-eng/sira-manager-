@@ -32,9 +32,18 @@ function cleanString(value, fallback = '', max = 160) {
   return (text || fallback).slice(0, max);
 }
 
+function durationDaysFor(value) {
+  const days = Number(value);
+  if (!Number.isFinite(days)) return 365;
+  return Math.max(1, Math.min(3650, Math.floor(days)));
+}
+
 function createLicense(input = {}) {
   const stockModel = MODELS.includes(String(input.stockModel).toUpperCase()) ? String(input.stockModel).toUpperCase() : 'BOUTIQUE';
   const maxUsers = Math.max(1, Math.min(100000, Number(input.maxUsers) || 1));
+  const createdAt = new Date();
+  const durationDays = durationDaysFor(input.durationDays);
+  const expiresAt = new Date(createdAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
   const payloadObject = {
     v: VERSION, id: crypto.randomBytes(9).toString('hex').toUpperCase(),
     merchantName: cleanString(input.merchantName, 'Commerce SIRA'), shopName: cleanString(input.shopName, 'SIRA Business'),
@@ -45,7 +54,7 @@ function createLicense(input = {}) {
     keypadLayout: KEYPADS.includes(String(input.keypadLayout).toUpperCase()) ? String(input.keypadLayout).toUpperCase() : 'GRID_4',
     country: cleanString(input.country, 'Burkina Faso', 80), currency: cleanString(input.currency, 'XOF', 10),
     cguText: cleanString(input.cguText, 'Licence officielle SIRA.', 500), privacyText: cleanString(input.privacyText, 'Données protégées et isolées.', 500),
-    createdAt: new Date().toISOString()
+    createdAt: createdAt.toISOString(), durationDays, expiresAt: expiresAt.toISOString()
   };
   const payload = base64url(JSON.stringify(payloadObject));
   return `${PREFIX}-${payload}.${sign(payload)}`;
@@ -61,7 +70,12 @@ function decodeLicense(key) {
   try {
     const data = JSON.parse(fromBase64url(payload));
     if (!data || data.v !== VERSION || !MODELS.includes(data.stockModel)) return null;
-    data.maxUsers = Math.max(1, Number(data.maxUsers) || 1); data.features = profileFor(data.stockModel); return data;
+    data.maxUsers = Math.max(1, Number(data.maxUsers) || 1);
+    data.features = profileFor(data.stockModel);
+    data.durationDays = durationDaysFor(data.durationDays);
+    data.expiresAt = typeof data.expiresAt === 'string' ? data.expiresAt : null;
+    data.expired = Boolean(data.expiresAt && Date.parse(data.expiresAt) <= Date.now());
+    return data;
   } catch (_) { return null; }
 }
 

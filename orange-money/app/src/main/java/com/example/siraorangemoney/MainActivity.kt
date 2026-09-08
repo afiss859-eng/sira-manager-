@@ -1,4 +1,4 @@
-package com.example.siraorangemoney
+package com.sira.orangemoney
 
 import android.app.Activity
 import android.os.Bundle
@@ -10,8 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
-private data class Tx(val reference: String, val amount: Long, val fee: Long, val timestamp: Long)
 
 class MainActivity : Activity() {
     private val store by lazy { OrangeLocalStore(this) }
@@ -40,7 +38,7 @@ private fun SiraOrangeMoneyScreen(store: OrangeLocalStore) {
                 item {
                     Button(onClick = {
                         val value = amount.toLongOrNull() ?: return@Button
-                        store.add(value, (value * 1L) / 100L)
+                        store.add(value, value / 100L)
                         transactions = store.all()
                         amount = ""
                     }, modifier = Modifier.fillMaxWidth()) { Text("Enregistrer l'opération") }

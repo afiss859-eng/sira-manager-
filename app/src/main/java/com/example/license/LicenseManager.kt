@@ -20,11 +20,23 @@ enum class KeypadLayoutType(val label: String) {
 }
 
 data class AppLicenseConfig(
-    val key: String = "", val merchantName: String = "", val shopName: String = "SIRA Business", val maxUsers: Int = 1, val usedCount: Int = 0,
-    val themeColorHex: String = "#005AC1", val appName: String = "SIRA Business", val logoUrl: String = "", val bgUrl: String = "",
+    val key: String = "",
+    val merchantName: String = "",
+    val shopName: String = "SIRA Business",
+    val maxUsers: Int = 1,
+    val usedCount: Int = 0,
+    val stockModel: String = "BOUTIQUE",
+    val themeColorHex: String = "#005AC1",
+    val appName: String = "SIRA Business",
+    val profilePhotoUrl: String = "",
+    val logoUrl: String = "",
+    val bgUrl: String = "",
     val cguText: String = "Licence officielle commerciale concédée par l'Organisation SIRA. Souveraineté totale des données.",
-    val privacyText: String = "Données marchandes isolées et hautement protégées. Aucune fuite cloud non autorisée.",
-    val keypadLayout: KeypadLayoutType = KeypadLayoutType.GRID_4, val isActivated: Boolean = false, val isRevoked: Boolean = false, val statusMessage: String = ""
+    val privacyText: String = "Données marchandes hautement protégées.",
+    val keypadLayout: KeypadLayoutType = KeypadLayoutType.GRID_4,
+    val isActivated: Boolean = false,
+    val isRevoked: Boolean = false,
+    val statusMessage: String = ""
 )
 
 class LicenseManager private constructor(private val context: Context) {
@@ -34,8 +46,8 @@ class LicenseManager private constructor(private val context: Context) {
     private val _licenseConfig = MutableStateFlow(loadSavedLicense())
     val licenseConfig: StateFlow<AppLicenseConfig> = _licenseConfig.asStateFlow()
 
-    // SIRA Control Plane deployed on the existing healthy Vercel project.
-    val cloudBaseUrl = "https://sira-website-doma1.vercel.app"
+    // SIRA Manager central license plane.
+    val cloudBaseUrl = "https://sira-manager-admin.vercel.app"
     val localBaseUrl = "http://127.0.0.1:8080"
 
     init {
@@ -46,8 +58,6 @@ class LicenseManager private constructor(private val context: Context) {
         }
         deviceId = did
 
-        // Re-check a previously activated license at startup and then periodically.
-        // A remote suspension/revocation therefore propagates to the APK without requiring a reinstall.
         if (_licenseConfig.value.isActivated && _licenseConfig.value.key.isNotBlank()) {
             scope.launch {
                 validateKeyOnline(_licenseConfig.value.key)
@@ -66,16 +76,18 @@ class LicenseManager private constructor(private val context: Context) {
         val merchant = prefs.getString("merchant_name", "Commerçant SIRA") ?: "Commerçant SIRA"
         val shop = prefs.getString("shop_name", "SIRA Business") ?: "SIRA Business"
         val maxUsers = prefs.getInt("max_users", 1)
-        val usedCount = prefs.getInt("used_count", 1)
+        val usedCount = prefs.getInt("used_count", 0)
+        val stockModel = prefs.getString("stock_model", "BOUTIQUE") ?: "BOUTIQUE"
         val color = prefs.getString("theme_color", "#005AC1") ?: "#005AC1"
         val appName = prefs.getString("app_name", "SIRA Business") ?: "SIRA Business"
+        val profilePhotoUrl = prefs.getString("profile_photo_url", "") ?: ""
         val logoUrl = prefs.getString("logo_url", "") ?: ""
         val bgUrl = prefs.getString("bg_url", "") ?: ""
-        val cgu = prefs.getString("cgu_text", "Licence officielle commerciale concédée par l'Organisation SIRA.") ?: ""
-        val privacy = prefs.getString("privacy_text", "Données marchandes isolées et hautement protégées.") ?: ""
+        val cgu = prefs.getString("cgu_text", "Licence officielle SIRA.") ?: ""
+        val privacy = prefs.getString("privacy_text", "Données protégées et isolées.") ?: ""
         val keypadStr = prefs.getString("keypad_layout", "GRID_4") ?: "GRID_4"
         val keypad = try { KeypadLayoutType.valueOf(keypadStr) } catch (_: Exception) { KeypadLayoutType.GRID_4 }
-        return AppLicenseConfig(key, merchant, shop, maxUsers, usedCount, color, appName, logoUrl, bgUrl, cgu, privacy, keypad, isAct, isRev,
+        return AppLicenseConfig(key, merchant, shop, maxUsers, usedCount, stockModel, color, appName, profilePhotoUrl, logoUrl, bgUrl, cgu, privacy, keypad, isAct, isRev,
             if (isRev) "LICENCE RÉVOQUÉE PAR L'ADMINISTRATEUR" else if (isAct) "Licence active" else "Non activée")
     }
 
@@ -86,10 +98,21 @@ class LicenseManager private constructor(private val context: Context) {
         if (validation.optBoolean("valid", false)) {
             val licObj = validation.optJSONObject("license") ?: JSONObject()
             val keypad = try { KeypadLayoutType.valueOf(licObj.optString("keypadLayout", "GRID_4")) } catch (_: Exception) { KeypadLayoutType.GRID_4 }
-            saveToPrefs(trimmed, true, false, licObj.optString("merchantName", "Commerçant"), licObj.optString("shopName", "Commerce SIRA"),
-                licObj.optInt("maxUsers", 1), licObj.optInt("usedCount", 1), licObj.optString("themeColor", "#005AC1"), licObj.optString("appName", "SIRA Business"),
-                licObj.optString("logoUrl", ""), licObj.optString("bgUrl", ""), licObj.optString("cguText", "Licence officielle commerciale concédée par l'Organisation SIRA."),
-                licObj.optString("privacyText", "Données marchandes isolées et hautement protégées."), keypad)
+            saveToPrefs(
+                trimmed, true, false,
+                licObj.optString("merchantName", "Commerçant"),
+                licObj.optString("shopName", "Commerce SIRA"),
+                licObj.optInt("maxUsers", 1),
+                licObj.optInt("usedCount", 0),
+                licObj.optString("stockModel", "BOUTIQUE"),
+                licObj.optString("themeColor", "#005AC1"),
+                licObj.optString("appName", "SIRA Business"),
+                licObj.optString("profilePhotoUrl", ""),
+                licObj.optString("logoUrl", ""),
+                licObj.optString("bgUrl", ""),
+                licObj.optString("cguText", "Licence officielle SIRA."),
+                licObj.optString("privacyText", "Données protégées et isolées."), keypad
+            )
             Result.success(_licenseConfig.value)
         } else {
             val error = validation.optString("error", "Clé de licence invalide ou quota dépassé.")
@@ -110,12 +133,22 @@ class LicenseManager private constructor(private val context: Context) {
 
             val licObj = validation.optJSONObject("license") ?: JSONObject()
             val keypad = try { KeypadLayoutType.valueOf(licObj.optString("keypadLayout", _licenseConfig.value.keypadLayout.name)) } catch (_: Exception) { _licenseConfig.value.keypadLayout }
-            saveToPrefs(keyToTest, true, false, licObj.optString("merchantName", _licenseConfig.value.merchantName), licObj.optString("shopName", _licenseConfig.value.shopName),
-                licObj.optInt("maxUsers", _licenseConfig.value.maxUsers), licObj.optInt("usedCount", _licenseConfig.value.usedCount), licObj.optString("themeColor", _licenseConfig.value.themeColorHex),
-                licObj.optString("appName", _licenseConfig.value.appName), licObj.optString("logoUrl", _licenseConfig.value.logoUrl), licObj.optString("bgUrl", _licenseConfig.value.bgUrl),
-                licObj.optString("cguText", _licenseConfig.value.cguText), licObj.optString("privacyText", _licenseConfig.value.privacyText), keypad)
+            saveToPrefs(
+                keyToTest, true, false,
+                licObj.optString("merchantName", _licenseConfig.value.merchantName),
+                licObj.optString("shopName", _licenseConfig.value.shopName),
+                licObj.optInt("maxUsers", _licenseConfig.value.maxUsers),
+                licObj.optInt("usedCount", _licenseConfig.value.usedCount),
+                licObj.optString("stockModel", _licenseConfig.value.stockModel),
+                licObj.optString("themeColor", _licenseConfig.value.themeColorHex),
+                licObj.optString("appName", _licenseConfig.value.appName),
+                licObj.optString("profilePhotoUrl", _licenseConfig.value.profilePhotoUrl),
+                licObj.optString("logoUrl", _licenseConfig.value.logoUrl),
+                licObj.optString("bgUrl", _licenseConfig.value.bgUrl),
+                licObj.optString("cguText", _licenseConfig.value.cguText),
+                licObj.optString("privacyText", _licenseConfig.value.privacyText), keypad
+            )
 
-            // Remote commands are intentionally constrained to safe control actions.
             val commands = validation.optJSONArray("commands")
             if (commands != null) {
                 for (i in 0 until commands.length()) {
@@ -128,7 +161,6 @@ class LicenseManager private constructor(private val context: Context) {
             }
             true
         } catch (_: Exception) {
-            // Offline: preserve the previously validated state; never bypass activation with a master key.
             _licenseConfig.value.isActivated && !_licenseConfig.value.isRevoked
         }
     }
@@ -136,9 +168,7 @@ class LicenseManager private constructor(private val context: Context) {
     suspend fun saveCustomization(appName: String, shopName: String, themeColorHex: String, logoUrl: String, bgUrl: String, cguText: String, privacyText: String, keypadLayout: KeypadLayoutType): Result<Unit> = withContext(Dispatchers.IO) {
         val currentKey = _licenseConfig.value.key
         if (currentKey.isBlank()) return@withContext Result.failure(Exception("Aucune licence active."))
-        saveToPrefs(currentKey, true, false, _licenseConfig.value.merchantName, shopName, _licenseConfig.value.maxUsers, _licenseConfig.value.usedCount, themeColorHex, appName, logoUrl, bgUrl, cguText, privacyText, keypadLayout)
-        val payload = JSONObject().apply { put("key", currentKey); put("appName", appName); put("shopName", shopName); put("themeColor", themeColorHex); put("logoUrl", logoUrl); put("bgUrl", bgUrl); put("cguText", cguText); put("privacyText", privacyText); put("keypadLayout", keypadLayout.name); put("deviceId", deviceId) }
-        try { sendPostRequest("$localBaseUrl/api/licenses/customize", payload) } catch (_: Exception) { }
+        saveToPrefs(currentKey, true, false, _licenseConfig.value.merchantName, shopName, _licenseConfig.value.maxUsers, _licenseConfig.value.usedCount, _licenseConfig.value.stockModel, themeColorHex, appName, _licenseConfig.value.profilePhotoUrl, logoUrl, bgUrl, cguText, privacyText, keypadLayout)
         Result.success(Unit)
     }
 
@@ -152,11 +182,30 @@ class LicenseManager private constructor(private val context: Context) {
         _licenseConfig.value = AppLicenseConfig(isActivated = false, isRevoked = false, statusMessage = "Application en attente d'activation par clé de licence")
     }
 
-    private fun saveToPrefs(key: String, isActivated: Boolean, isRevoked: Boolean, merchant: String, shop: String, maxUsers: Int, usedCount: Int, color: String, appName: String, logoUrl: String, bgUrl: String, cgu: String, privacy: String, keypad: KeypadLayoutType) {
-        prefs.edit().putString("license_key", key).putBoolean("is_activated", isActivated).putBoolean("is_revoked", isRevoked).putString("merchant_name", merchant).putString("shop_name", shop)
-            .putInt("max_users", maxUsers).putInt("used_count", usedCount).putString("theme_color", color).putString("app_name", appName).putString("logo_url", logoUrl).putString("bg_url", bgUrl)
-            .putString("cgu_text", cgu).putString("privacy_text", privacy).putString("keypad_layout", keypad.name).apply()
-        _licenseConfig.value = AppLicenseConfig(key, merchant, shop, maxUsers, usedCount, color, appName, logoUrl, bgUrl, cgu, privacy, keypad, isActivated, isRevoked, if (isRevoked) "RÉVOQUÉE" else "Activée avec succès")
+    private fun saveToPrefs(
+        key: String, isActivated: Boolean, isRevoked: Boolean, merchant: String, shop: String, maxUsers: Int, usedCount: Int,
+        stockModel: String, color: String, appName: String, profilePhotoUrl: String, logoUrl: String, bgUrl: String, cgu: String, privacy: String, keypad: KeypadLayoutType
+    ) {
+        prefs.edit()
+            .putString("license_key", key)
+            .putBoolean("is_activated", isActivated)
+            .putBoolean("is_revoked", isRevoked)
+            .putString("merchant_name", merchant)
+            .putString("shop_name", shop)
+            .putInt("max_users", maxUsers)
+            .putInt("used_count", usedCount)
+            .putString("stock_model", stockModel)
+            .putString("theme_color", color)
+            .putString("app_name", appName)
+            .putString("profile_photo_url", profilePhotoUrl)
+            .putString("logo_url", logoUrl)
+            .putString("bg_url", bgUrl)
+            .putString("cgu_text", cgu)
+            .putString("privacy_text", privacy)
+            .putString("keypad_layout", keypad.name)
+            .apply()
+        _licenseConfig.value = AppLicenseConfig(key, merchant, shop, maxUsers, usedCount, stockModel, color, appName, profilePhotoUrl, logoUrl, bgUrl, cgu, privacy, keypad, isActivated, isRevoked,
+            if (isRevoked) "RÉVOQUÉE" else "Activée avec succès")
     }
 
     private fun callValidateEndpoint(key: String): JSONObject {
@@ -175,7 +224,7 @@ class LicenseManager private constructor(private val context: Context) {
 
     private fun sendPostRequest(targetUrl: String, body: JSONObject): String {
         val conn = (URL(targetUrl).openConnection() as HttpURLConnection)
-        conn.requestMethod = "POST"; conn.connectTimeout = 5000; conn.readTimeout = 5000; conn.doOutput = true
+        conn.requestMethod = "POST"; conn.connectTimeout = 7000; conn.readTimeout = 7000; conn.doOutput = true
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8"); conn.setRequestProperty("Accept", "application/json")
         OutputStreamWriter(conn.outputStream, StandardCharsets.UTF_8).use { it.write(body.toString()); it.flush() }
         val code = conn.responseCode

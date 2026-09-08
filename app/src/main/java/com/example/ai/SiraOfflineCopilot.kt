@@ -15,6 +15,53 @@ import java.util.Locale
 class SiraOfflineCopilot {
     private val format = NumberFormat.getIntegerInstance(Locale.FRENCH)
 
+    fun answerFromContext(query: String, context: Map<String, Any?>): String? {
+        val q = query.lowercase(Locale.FRENCH).trim()
+        if (q.isBlank()) return null
+
+        val productCount = (context["productCount"] as? Number)?.toInt() ?: 0
+        val lowStockCount = (context["lowStockCount"] as? Number)?.toInt() ?: 0
+        val salesCount = (context["salesCount"] as? Number)?.toInt() ?: 0
+        val revenue = (context["salesRevenue"] as? Number)?.toDouble() ?: 0.0
+        val profit = (context["salesProfit"] as? Number)?.toDouble() ?: 0.0
+        val customers = (context["customerCount"] as? Number)?.toInt() ?: 0
+        val suppliers = (context["supplierCount"] as? Number)?.toInt() ?: 0
+        val orangeToday = (context["orangeMoneyToday"] as? Number)?.toDouble() ?: 0.0
+
+        // Orange Money is checked before generic profit questions so that
+        // "bénéfice Orange Money" is answered with the correct metric.
+        if (containsAny(q, "orange money", "orange", "commission")) {
+            return "🟠 Orange Money aujourd'hui : ${format.format(orangeToday.toLong())} FCFA de commissions selon les données locales."
+        }
+        if (containsAny(q, "rupture", "stock faible", "inventaire")) {
+            return if (lowStockCount == 0) {
+                "✅ Aucun article n'est actuellement en alerte de stock faible dans la base locale."
+            } else {
+                "⚠️ $lowStockCount article(s) sont actuellement en alerte de stock. Ouvrez Stock pour voir les références concernées."
+            }
+        }
+        if (containsAny(q, "chiffre d'affaires", "chiffre", "ca", "vente", "ventes", "revenu", "recette")) {
+            return "📊 Votre base locale compte $salesCount vente(s), pour ${format.format(revenue.toLong())} FCFA de chiffre d'affaires cumulé."
+        }
+        if (containsAny(q, "marge", "profit", "bénéfice", "benefice", "perte")) {
+            return "💰 Bénéfice brut cumulé dans la base locale : ${format.format(profit.toLong())} FCFA."
+        }
+        if (containsAny(q, "catalogue", "produits", "références", "references")) {
+            return "📦 Le catalogue local contient $productCount référence(s), avec $lowStockCount alerte(s) de stock."
+        }
+        if (containsAny(q, "client", "clients")) {
+            return "👥 $customers client(s) sont enregistrés dans votre base locale SIRA."
+        }
+        if (containsAny(q, "fournisseur", "fournisseurs")) {
+            return "🚚 $suppliers fournisseur(s) sont enregistrés dans votre base locale SIRA."
+        }
+        if (containsAny(q, "bonjour", "salut", "hello")) {
+            return "Bonjour 👋 Je suis SIRA Copilote. Je fonctionne hors ligne pour les analyses disponibles dans vos données locales."
+        }
+
+        return null
+    }
+
     fun answer(
         query: String,
         products: List<Product> = emptyList(),
@@ -22,53 +69,15 @@ class SiraOfflineCopilot {
         saleItems: List<SaleItem> = emptyList(),
         cashTransactions: List<CashTransaction> = emptyList()
     ): String? {
-        val q = query.lowercase(Locale.FRENCH).trim()
-        if (q.isBlank()) return null
-
-        if (containsAny(q, "stock", "rupture", "inventaire", "produit")) {
-            val low = products.filter { it.isLowStock }.sortedBy { it.quantity }
-            if (containsAny(q, "rupture", "manque", "bientôt", "bientot", "faible")) {
-                if (low.isEmpty()) return "✅ Aucun produit n'est actuellement en alerte de stock faible dans les données locales."
-                val details = low.take(8).joinToString("\n") { p ->
-                    "• ${p.name} : ${p.quantity} unité(s)${if (p.quantity == 0) " — RUPTURE" else ""}"
-                }
-                return "📦 Produits à surveiller (${low.size}) :\n$details\n\nLes données viennent directement de votre stock local."
-            }
-            val value = products.sumOf { it.quantity * it.purchasePrice }
-            return "📦 Votre base locale contient ${products.size} référence(s), pour une valeur d'achat de ${format.format(value.toLong())} FCFA."
-        }
-
-        if (containsAny(q, "chiffre", "ca", "vente", "ventes", "revenu", "recette")) {
-            val revenue = sales.sumOf { it.totalAmount }
-            val profit = sales.sumOf { it.profitAmount }
-            return "📊 Données locales : ${sales.size} vente(s), chiffre d'affaires cumulé de ${format.format(revenue.toLong())} FCFA et bénéfice brut estimé de ${format.format(profit.toLong())} FCFA."
-        }
-
-        if (containsAny(q, "marge", "profit", "bénéfice", "benefice", "perte")) {
-            val negative = products.filter { it.salePrice < it.purchasePrice }
-            val profit = sales.sumOf { it.profitAmount }
-            return if (negative.isEmpty()) {
-                "💰 Bénéfice brut cumulé : ${format.format(profit.toLong())} FCFA. Aucun produit vendu sous son prix d'achat n'est détecté dans les données locales."
-            } else {
-                "⚠️ Bénéfice brut cumulé : ${format.format(profit.toLong())} FCFA. ${negative.size} produit(s) ont actuellement un prix de vente inférieur au prix d'achat."
-            }
-        }
-
-        if (containsAny(q, "orange money", "orange", "commission")) {
-            val (commission, count, volume) = calculateOrangeToday(cashTransactions)
-            return "🟠 Orange Money aujourd'hui : ${format.format(commission.toLong())} FCFA de commissions, $count opération(s), volume ${format.format(volume.toLong())} FCFA."
-        }
-
-        if (containsAny(q, "client", "clients", "crédit", "credit", "dette")) {
-            val credit = products // keep the function pure; customer totals are handled by the report path
-            return "👥 Le copilote local peut analyser les clients et crédits dès que les données clients lui sont fournies par l'écran."
-        }
-
-        if (containsAny(q, "bonjour", "salut", "hello")) {
-            return "Bonjour 👋 Je suis SIRA Copilote. Je peux déjà analyser hors ligne votre stock, vos ventes, vos marges et Orange Money à partir des données locales."
-        }
-
-        return "Je suis en mode hors ligne. Essayez : « produits en rupture », « mon chiffre d'affaires », « ma marge » ou « bénéfice Orange Money aujourd'hui »."
+        return answerFromContext(query, mapOf(
+            "productCount" to products.size,
+            "lowStockCount" to products.count { it.isLowStock },
+            "salesCount" to sales.size,
+            "salesRevenue" to sales.sumOf { it.totalAmount },
+            "salesProfit" to sales.sumOf { it.profitAmount },
+            "cashTransactionCount" to cashTransactions.size,
+            "orangeMoneyToday" to calculateOrangeToday(cashTransactions).first
+        ))
     }
 
     private fun containsAny(value: String, vararg terms: String): Boolean = terms.any(value::contains)

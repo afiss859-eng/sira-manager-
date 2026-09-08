@@ -1,4 +1,4 @@
-package com.example.siraorangemoney
+package com.sira.orangemoney
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -69,11 +69,11 @@ class OrangeLicenseClient(context: Context) {
             val json = runCatching { JSONObject(text) }.getOrNull()
 
             if (code !in 200..299) {
-                return@withContext Result.failure(Exception(json?.optString("error", null) ?: "Licence invalide."))
+                return@withContext Result.failure(Exception(json?.optString("error") ?: "Licence invalide."))
             }
 
             if (json?.optBoolean("valid") != true) {
-                return@withContext Result.failure(Exception(json?.optString("error", null) ?: "Licence invalide."))
+                return@withContext Result.failure(Exception(json?.optString("error") ?: "Licence invalide."))
             }
 
             val appName = json.optJSONObject("license")?.optString("appName", "SIRA Orange Money")

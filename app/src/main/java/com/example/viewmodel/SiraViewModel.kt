@@ -41,7 +41,6 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     val licenseManager = com.example.license.LicenseManager.getInstance(application)
     val currentUser: StateFlow<SiraAuthUser> = authManager.currentUser
     val licenseConfig: StateFlow<com.example.license.AppLicenseConfig> = licenseManager.licenseConfig
-
     private val _currentDatabase = MutableStateFlow(SiraDatabase.getDatabaseForUser(application, currentUser.value.id, viewModelScope))
     private val _repository = MutableStateFlow(SiraRepository(_currentDatabase.value))
     val paymentManager = PaymentManager()
@@ -49,27 +48,19 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     private val cloudCopilot = SiraCloudCopilot(licenseManager)
     private val bluetoothPrinter = SiraBluetoothPrinter(application)
     private val printQueue = SiraPrintQueue(application)
-
     private val _printStatus = MutableStateFlow<String?>(null)
     val printStatus: StateFlow<String?> = _printStatus.asStateFlow()
     private val _defaultPrinterMac = MutableStateFlow(bluetoothPrinter.getDefaultPrinterMac())
     val defaultPrinterMac: StateFlow<String?> = _defaultPrinterMac.asStateFlow()
     private val _pendingPrintCount = MutableStateFlow(printQueue.pendingCount())
     val pendingPrintCount: StateFlow<Int> = _pendingPrintCount.asStateFlow()
-
     private val _currentTab = MutableStateFlow(SiraNavTab.DASHBOARD)
     val currentTab: StateFlow<SiraNavTab> = _currentTab.asStateFlow()
     fun selectTab(tab: SiraNavTab) { _currentTab.value = tab }
-
     private val _merchantProfile = MutableStateFlow(MerchantProfile(shopName = currentUser.value.shopName, merchantName = currentUser.value.displayName, email = currentUser.value.email, city = currentUser.value.city))
     val merchantProfile: StateFlow<MerchantProfile> = _merchantProfile.asStateFlow()
-
-    init {
-        webServer.start(8080)
-        retryPendingReceiptPrints()
-    }
+    init { webServer.start(8080); retryPendingReceiptPrints() }
     override fun onCleared() { super.onCleared(); webServer.stop() }
-
     fun switchUser(user: SiraAuthUser) {
         viewModelScope.launch {
             val db = SiraDatabase.getDatabaseForUser(getApplication(), user.id, viewModelScope)
@@ -90,7 +81,6 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
         return res
     }
     fun checkLicenseStatus() { viewModelScope.launch { licenseConfig.value.key.takeIf { it.isNotBlank() }?.let { licenseManager.validateKeyOnline(it) } } }
-
     val products = _repository.flatMapLatest { it.allProducts }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val lowStockProducts = _repository.flatMapLatest { it.lowStockProducts }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val sales = _repository.flatMapLatest { it.allSales }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -100,7 +90,6 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     val suppliers = _repository.flatMapLatest { it.allSuppliers }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val cashTransactions = _repository.flatMapLatest { it.allCashTransactions }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val syncLogs = _repository.flatMapLatest { it.allSyncLogs }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
     private val _searchResults = MutableStateFlow(GlobalSearchResult())
@@ -109,80 +98,37 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
     fun setSearchQuery(query: String) { _searchQuery.value = query; if (query.isBlank()) { _searchResults.value = GlobalSearchResult(); _isSearching.value = false } else { _isSearching.value = true; viewModelScope.launch { _searchResults.value = _repository.value.performGlobalSearch(query) } } }
     fun clearSearch() { _searchQuery.value = ""; _searchResults.value = GlobalSearchResult(); _isSearching.value = false }
-
     fun quickStockAdjust(productId: Long, delta: Int) { viewModelScope.launch { _repository.value.adjustProductStock(productId, delta) } }
     fun saveProduct(product: Product) { viewModelScope.launch { if (product.id == 0L) _repository.value.insertProduct(product) else _repository.value.updateProduct(product) } }
     fun deleteProduct(product: Product) { viewModelScope.launch { _repository.value.deleteProduct(product) } }
-
-    fun setDefaultBluetoothPrinter(macAddress: String) {
-        bluetoothPrinter.setDefaultPrinter(macAddress)
-        _defaultPrinterMac.value = bluetoothPrinter.getDefaultPrinterMac()
-        _printStatus.value = "Imprimante configurée : $macAddress"
-        retryPendingReceiptPrints()
-    }
+    fun setDefaultBluetoothPrinter(macAddress: String) { bluetoothPrinter.setDefaultPrinter(macAddress); _defaultPrinterMac.value = bluetoothPrinter.getDefaultPrinterMac(); _printStatus.value = "Imprimante configurée : $macAddress"; retryPendingReceiptPrints() }
     fun clearPrintStatus() { _printStatus.value = null }
-
-    private fun enqueueReceiptPrint(sale: Sale, items: List<SaleItem>) {
-        printQueue.enqueue(sale, items)
-        _pendingPrintCount.value = printQueue.pendingCount()
-        retryPendingReceiptPrints()
-    }
-
+    private fun enqueueReceiptPrint(sale: Sale, items: List<SaleItem>) { printQueue.enqueue(sale, items); _pendingPrintCount.value = printQueue.pendingCount(); retryPendingReceiptPrints() }
     fun retryPendingReceiptPrints() {
         viewModelScope.launch(Dispatchers.IO) {
             val pending = printQueue.takeAll()
-            if (pending.isEmpty()) {
-                _pendingPrintCount.value = 0
-                return@launch
-            }
+            if (pending.isEmpty()) { _pendingPrintCount.value = 0; return@launch }
             _printStatus.value = "Tentative d'impression de ${pending.size} reçu(s)…"
-            val remaining = mutableListOf<Pair<Sale, List<SaleItem>>()>()
+            val remaining = mutableListOf<Pair<Sale, List<SaleItem>>>()
             for (receipt in pending) {
                 val result = bluetoothPrinter.printSale(receipt.first, receipt.second)
                 if (result.isFailure) remaining += receipt
             }
-            printQueue.replace(remaining)
-            _pendingPrintCount.value = remaining.size
-            _printStatus.value = if (remaining.isEmpty()) {
-                "Reçu(s) imprimé(s) automatiquement"
-            } else {
-                "${remaining.size} reçu(s) en attente d'impression"
-            }
+            printQueue.replace(remaining); _pendingPrintCount.value = remaining.size
+            _printStatus.value = if (remaining.isEmpty()) "Reçu(s) imprimé(s) automatiquement" else "${remaining.size} reçu(s) en attente d'impression"
         }
     }
-
     private val _lastGeneratedInvoiceSale = MutableStateFlow<Pair<Sale, List<SaleItem>>?>(null)
     val lastGeneratedInvoiceSale: StateFlow<Pair<Sale, List<SaleItem>>?> = _lastGeneratedInvoiceSale.asStateFlow()
     fun closeInvoiceDialog() { _lastGeneratedInvoiceSale.value = null }
     fun showInvoiceForSale(sale: Sale) { viewModelScope.launch { _lastGeneratedInvoiceSale.value = Pair(sale, _repository.value.getSaleItems(sale.id)) } }
-    fun completeSale(sale: Sale, items: List<SaleItem>, onComplete: (Long) -> Unit = {}) {
-        viewModelScope.launch {
-            val saleId = _repository.value.recordSale(sale, items)
-            val recordedSale = sale.copy(id = saleId)
-            val recordedItems = items.map { it.copy(saleId = saleId) }
-            _lastGeneratedInvoiceSale.value = Pair(recordedSale, recordedItems)
-            onComplete(saleId)
-            enqueueReceiptPrint(recordedSale, recordedItems)
-        }
-    }
+    fun completeSale(sale: Sale, items: List<SaleItem>, onComplete: (Long) -> Unit = {}) { viewModelScope.launch { val saleId = _repository.value.recordSale(sale, items); val recordedSale = sale.copy(id = saleId); val recordedItems = items.map { it.copy(saleId = saleId) }; _lastGeneratedInvoiceSale.value = Pair(recordedSale, recordedItems); onComplete(saleId); enqueueReceiptPrint(recordedSale, recordedItems) } }
     fun completePurchase(purchase: Purchase, items: List<PurchaseItem>, onComplete: (Long) -> Unit = {}) { viewModelScope.launch { onComplete(_repository.value.recordPurchase(purchase, items)) } }
-
     fun saveCustomer(customer: Customer) { viewModelScope.launch { if (customer.id == 0L) _repository.value.insertCustomer(customer) else _repository.value.updateCustomer(customer) } }
     fun deleteCustomer(customer: Customer) { viewModelScope.launch { _repository.value.deleteCustomer(customer) } }
     fun saveSupplier(supplier: Supplier) { viewModelScope.launch { if (supplier.id == 0L) _repository.value.insertSupplier(supplier) else _repository.value.updateSupplier(supplier) } }
     fun deleteSupplier(supplier: Supplier) { viewModelScope.launch { _repository.value.deleteSupplier(supplier) } }
-
-    fun recordCashOp(tx: CashTransaction) {
-        viewModelScope.launch {
-            val currentTxList = _repository.value.allCashTransactions.first()
-            val balanceBefore = currentTxList.filter { it.channel == tx.channel }.sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }
-            val delta = if (tx.type.isCredit) tx.amount else -(tx.amount + tx.fee)
-            val balanceAfter = balanceBefore + delta
-            _repository.value.recordCashTransaction(tx)
-            com.example.notification.SiraNotificationManager.showTransactionValidatedNotification(getApplication(), tx.reference, tx.beneficiaryOrPayer ?: "Client SIRA", tx.amount, tx.fee, balanceBefore, balanceAfter, tx.channel.label)
-        }
-    }
-
+    fun recordCashOp(tx: CashTransaction) { viewModelScope.launch { val currentTxList = _repository.value.allCashTransactions.first(); val balanceBefore = currentTxList.filter { it.channel == tx.channel }.sumOf { if (it.type.isCredit) it.amount else -(it.amount + it.fee) }; val delta = if (tx.type.isCredit) tx.amount else -(tx.amount + tx.fee); val balanceAfter = balanceBefore + delta; _repository.value.recordCashTransaction(tx); com.example.notification.SiraNotificationManager.showTransactionValidatedNotification(getApplication(), tx.reference, tx.beneficiaryOrPayer ?: "Client SIRA", tx.amount, tx.fee, balanceBefore, balanceAfter, tx.channel.label) } }
     private val _ocrResult = MutableStateFlow<OcrScanResult?>(null)
     val ocrResult: StateFlow<OcrScanResult?> = _ocrResult.asStateFlow()
     val ocrStatus: StateFlow<OcrScanResult?> = _ocrResult.asStateFlow()
@@ -192,46 +138,16 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     fun runOcrOnDocument(bitmap: Bitmap, onResult: (OcrScanResult) -> Unit = {}) { runOcrOnBitmap(bitmap, onResult) }
     fun runOcrOnUri(uri: Uri, onResult: (OcrScanResult) -> Unit = {}) { viewModelScope.launch { _isOcrLoading.value = true; val result = SiraOcrEngine.scanDocumentUri(getApplication(), uri); _ocrResult.value = result; _isOcrLoading.value = false; onResult(result) } }
     fun clearOcrResult() { _ocrResult.value = null }
-
     private val _aiReport = MutableStateFlow<SiraIntelligenceReport?>(null)
     val aiReport: StateFlow<SiraIntelligenceReport?> = _aiReport.asStateFlow()
     private val _isAiLoading = MutableStateFlow(false)
     val isAiLoading: StateFlow<Boolean> = _isAiLoading.asStateFlow()
     private val _aiInteractiveAnswer = MutableStateFlow<String?>(null)
     val aiInteractiveAnswer: StateFlow<String?> = _aiInteractiveAnswer.asStateFlow()
-    fun askAiMerchantQuery(query: String) {
-        viewModelScope.launch {
-            _isAiLoading.value = true
-            // SOURCE DE VÉRITÉ : la base SQLite locale du commerçant actif.
-            val localResult = SiraLocalCopilot(_repository.value).answer(query)
-            if (localResult.isSuccess) {
-                _aiInteractiveAnswer.value = localResult.getOrThrow()
-            } else {
-                _aiInteractiveAnswer.value = aiService.answerMerchantQuery(query, cashTransactions.value, sales.value)
-            }
-            if (localResult.isFailure && licenseConfig.value.isActivated) {
-                val context = mapOf(
-                    "shopName" to merchantProfile.value.shopName,
-                    "productCount" to products.value.size,
-                    "lowStockCount" to lowStockProducts.value.size,
-                    "salesCount" to sales.value.size,
-                    "salesRevenue" to sales.value.sumOf { it.totalAmount },
-                    "salesProfit" to sales.value.sumOf { it.profitAmount },
-                    "customerCount" to customers.value.size,
-                    "supplierCount" to suppliers.value.size,
-                    "cashTransactionCount" to cashTransactions.value.size,
-                    "orangeMoneyToday" to getOrangeMoneyDailyStats().first
-                )
-                val cloud = cloudCopilot.ask(query, context)
-                if (cloud.isSuccess) _aiInteractiveAnswer.value = cloud.getOrThrow()
-            }
-            _isAiLoading.value = false
-        }
-    }
+    fun askAiMerchantQuery(query: String) { viewModelScope.launch { _isAiLoading.value = true; val localResult = SiraLocalCopilot(_repository.value).answer(query); if (localResult.isSuccess) _aiInteractiveAnswer.value = localResult.getOrThrow() else _aiInteractiveAnswer.value = aiService.answerMerchantQuery(query, cashTransactions.value, sales.value); if (localResult.isFailure && licenseConfig.value.isActivated) { val context = mapOf("shopName" to merchantProfile.value.shopName, "productCount" to products.value.size, "lowStockCount" to lowStockProducts.value.size, "salesCount" to sales.value.size, "salesRevenue" to sales.value.sumOf { it.totalAmount }, "salesProfit" to sales.value.sumOf { it.profitAmount }, "customerCount" to customers.value.size, "supplierCount" to suppliers.value.size, "cashTransactionCount" to cashTransactions.value.size, "orangeMoneyToday" to getOrangeMoneyDailyStats().first); val cloud = cloudCopilot.ask(query, context); if (cloud.isSuccess) _aiInteractiveAnswer.value = cloud.getOrThrow() }; _isAiLoading.value = false } }
     fun clearAiInteractiveAnswer() { _aiInteractiveAnswer.value = null }
     fun getOrangeMoneyDailyStats(): Triple<Double, Int, Double> = aiService.calculateOrangeMoneyDailyProfit(cashTransactions.value)
     fun runSiraIntelligence() { viewModelScope.launch { _isAiLoading.value = true; _aiReport.value = aiService.generateBusinessReport(products.value, sales.value, saleItems.value, customers.value, cashTransactions.value); _isAiLoading.value = false } }
-
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
     private val _syncMessage = MutableStateFlow<String?>("Prêt (Bases locales SQLite sécurisées)")

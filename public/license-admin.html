@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>SIRA — Générateur de licences</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#0f172a;background:#f4f7fb}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1100px;margin:auto;padding:28px 18px 60px}.header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:22px}.brand{display:flex;align-items:center;gap:12px}.brand img{width:46px;height:46px;border-radius:14px;object-fit:cover}.brand h1{font-size:20px;margin:0}.brand p{margin:3px 0 0;color:#64748b;font-size:12px}.badge{padding:8px 12px;border-radius:999px;background:#e0ecff;color:#1454d9;font-size:12px;font-weight:700}.grid{display:grid;grid-template-columns:1.25fr .75fr;gap:18px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:22px;padding:20px;box-shadow:0 14px 38px rgba(15,23,42,.06)}.card h2{margin:0 0 5px;font-size:17px}.sub{color:#64748b;font-size:12px;margin:0 0 18px}.form{display:grid;grid-template-columns:1fr 1fr;gap:13px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:12px;font-weight:700;color:#334155}.field input,.field select{width:100%;padding:12px 13px;border:1px solid #d8dee8;border-radius:12px;font:inherit;background:#fbfdff}.mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.mode{border:1px solid #d8dee8;border-radius:14px;padding:12px;cursor:pointer;background:#fff}.mode input{display:none}.mode strong{display:block;font-size:13px}.mode span{display:block;font-size:10px;color:#64748b;margin-top:4px;line-height:1.4}.mode.active{border-color:#2563eb;background:#eff6ff}.btn{border:0;border-radius:13px;padding:13px 16px;font-weight:800;cursor:pointer;font:inherit}.primary{background:#2563eb;color:#fff}.secondary{background:#eef2f7;color:#172033}.actions{display:flex;gap:10px;margin-top:14px}.result{margin-top:16px;padding:14px;border-radius:15px;background:#f8fafc;border:1px dashed #cbd5e1}.key{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.6;word-break:break-all;padding:11px;border-radius:11px;background:#0f172a;color:#fff}.muted{color:#64748b;font-size:11px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}.stat{padding:14px;border-radius:15px;background:#f8fafc;border:1px solid #e8edf3}.stat b{display:block;font-size:20px}.stat span{font-size:11px;color:#64748b}.list{display:flex;flex-direction:column;gap:9px;max-height:520px;overflow:auto}.item{padding:12px;border:1px solid #e5e7eb;border-radius:13px}.item .top{display:flex;justify-content:space-between;gap:10px}.item strong{font-size:12px}.item small{display:block;color:#64748b;font-size:10px;margin-top:4px}.notice{margin-top:16px;padding:11px 13px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:11px;line-height:1.5}.ok{margin-top:10px;color:#166534;font-size:11px}.error{margin-top:10px;color:#b91c1c;font-size:11px}@media(max-width:850px){.grid{grid-template-columns:1fr}.form{grid-template-columns:1fr}.mode-grid{grid-template-columns:1fr}.header{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="header"><div class="brand"><img src="sira_logo.jpg" alt="SIRA"><div><h1>Centre de contrôle SIRA</h1><p>Création et personnalisation des licences SIRA Manager</p></div></div><div class="badge">LICENCE V2</div></header>
+  <div class="grid">
+    <section class="card">
+      <h2>Nouvelle licence</h2><p class="sub">Une seule clé contient le profil de capacités, le quota d'utilisateurs et le branding de l'organisation.</p>
+      <form id="form">
+        <div class="field"><label>Nom du responsable / commerçant</label><input id="merchantName" required placeholder="Ex. Société ABC"></div>
+        <div class="field"><label>Nom de la boutique / organisation</label><input id="shopName" required placeholder="Ex. ABC Distribution"></div>
+        <div class="field full"><label>Modèle SIRA</label><div class="mode-grid" id="modes">
+          <label class="mode active"><input type="radio" name="stockModel" value="BOUTIQUE" checked><strong>🏪 Boutique</strong><span>Commerce simple, stock et ventes.</span></label>
+          <label class="mode"><input type="radio" name="stockModel" value="NATIONAL"><strong>🏭 Entrepôt national</strong><span>Multi-boutiques, dépôts, transferts.</span></label>
+          <label class="mode"><input type="radio" name="stockModel" value="INTERNATIONAL"><strong>🌍 Entrepôt international</strong><span>Multi-pays, devises et logistique avancée.</span></label>
+        </div></div>
+        <div class="field"><label>Nombre total d'utilisateurs autorisés</label><input id="maxUsers" type="number" min="1" max="100000" value="1" required></div>
+        <div class="field"><label>Pays</label><input id="country" value="Burkina Faso"></div>
+        <div class="field"><label>Nom de l'application</label><input id="appName" value="SIRA Business"></div>
+        <div class="field"><label>Devise principale</label><input id="currency" value="XOF"></div>
+        <div class="field"><label>Couleur principale</label><input id="themeColor" type="color" value="#005AC1" style="height:43px;padding:3px"></div>
+        <div class="field"><label>Disposition des touches</label><select id="keypadLayout"><option value="GRID_4">Grille 4 touches</option><option value="GRID_2">2 grandes touches</option><option value="LIST_COMPACT">Liste compacte</option></select></div>
+        <div class="field full"><label>Photo de profil / avatar de l'organisation (URL)</label><input id="profilePhotoUrl" type="url" placeholder="https://.../profil.jpg"></div>
+        <div class="field full"><label>Logo personnalisé (URL)</label><input id="logoUrl" type="url" placeholder="https://.../logo.png"></div>
+        <div class="field full"><label>Image de fond (URL)</label><input id="bgUrl" type="url" placeholder="https://.../fond.jpg"></div>
+        <div class="field"><label>CGU personnalisées</label><input id="cguText" value="Licence officielle SIRA."></div>
+        <div class="field"><label>Politique de confidentialité</label><input id="privacyText" value="Données protégées et isolées."></div>
+        <div class="actions full"><button class="btn secondary" type="reset">Réinitialiser</button><button class="btn primary" type="submit">Générer la clé</button></div>
+      </form>
+      <div id="result" class="result" hidden></div>
+      <div class="notice">La clé générée ici utilise exactement le même format que celui accepté par l'APK. Le modèle sélectionné détermine les capacités autorisées ; l'utilisateur final ne peut pas les augmenter depuis l'application.</div>
+    </section>
+    <aside class="card">
+      <h2>Suivi local du panel</h2><p class="sub">Le navigateur garde la liste des clés générées sur cet appareil.</p>
+      <div class="stats"><div class="stat"><b id="countKeys">0</b><span>Clés générées</span></div><div class="stat"><b id="countUsers">0</b><span>Utilisateurs autorisés</span></div></div>
+      <div id="list" class="list"></div>
+      <p class="muted">La clé elle-même transporte les paramètres de personnalisation et le profil. Le serveur de validation contrôle sa structure avant activation.</p>
+    </aside>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);const listKey='sira_license_admin_v2';let items=[];try{items=JSON.parse(localStorage.getItem(listKey)||'[]')}catch{}
+function save(){localStorage.setItem(listKey,JSON.stringify(items));render()}
+function render(){ $('countKeys').textContent=items.length;$('countUsers').textContent=items.reduce((n,x)=>n+Number(x.maxUsers||0),0);$('list').innerHTML=items.length?items.map(x=>`<div class="item"><div class="top"><strong>${escapeHtml(x.appName)}</strong><span class="muted">${escapeHtml(x.stockModel)}</span></div><div class="key" style="margin-top:8px">${escapeHtml(x.key)}</div><small>${escapeHtml(x.shopName)} · ${x.maxUsers} utilisateur(s)</small></div>`).join(''):'<div class="muted">Aucune clé générée sur ce navigateur.</div>' }
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+$('modes').addEventListener('change',e=>document.querySelectorAll('.mode').forEach(m=>m.classList.toggle('active',m.querySelector('input').checked)));
+$('form').addEventListener('submit',async e=>{e.preventDefault();const body={merchantName:$('merchantName').value,shopName:$('shopName').value,stockModel:document.querySelector('input[name="stockModel"]:checked').value,maxUsers:$('maxUsers').value,country:$('country').value,currency:$('currency').value,appName:$('appName').value,themeColor:$('themeColor').value,keypadLayout:$('keypadLayout').value,profilePhotoUrl:$('profilePhotoUrl').value,logoUrl:$('logoUrl').value,bgUrl:$('bgUrl').value,cguText:$('cguText').value,privacyText:$('privacyText').value};$('result').hidden=false;$('result').innerHTML='<div class="muted">Génération en cours…</div>';try{const r=await fetch('/api/licenses/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'Erreur');items.unshift({key:data.licenseKey,...body,maxUsers:Number(body.maxUsers)});save();$('result').innerHTML=`<div><strong>Clé générée</strong></div><div class="key" style="margin-top:9px">${escapeHtml(data.licenseKey)}</div><div class="ok">Cette clé peut maintenant être saisie dans l'APK SIRA Manager.</div><div class="actions"><button class="btn secondary" type="button" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(data.licenseKey)})">Copier</button></div>`}catch(err){$('result').innerHTML=`<div class="error">${escapeHtml(err.message)}</div>`}});render();
+</script>
+</body></html>

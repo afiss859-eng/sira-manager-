@@ -110,10 +110,6 @@ jobs:
           cp orange-money/app/build/outputs/apk/release/app-release.apk "dist/SIRA-Orange-Money-${{ steps.version.outputs.version }}.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt
 
-      - name: Ensure tag exists
-        if: github.ref_type != 'tag'
-        run: git tag "v${{ steps.version.outputs.version }}" "${GITHUB_SHA}" && git push origin "v${{ steps.version.outputs.version }}"
-
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:

@@ -26,12 +26,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import kotlinx.coroutines.delay
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -57,128 +58,6 @@ fun BarcodeScannerDialog(
         if (!cameraGranted) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
-    LaunchedEffect(statusMessage) {
-        if (!statusMessage.isNullOrBlank()) delay(1200)
-    }
-
-    DialogSurface(onDismiss = onDismiss) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    modifier = Modifier.size(42.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.QrCodeScanner,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Scanner les produits", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Scannez plusieurs codes à la suite",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Fermer")
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp)
-            ) {
-                if (cameraGranted) {
-                    ScannerCamera(
-                        lifecycleOwner = lifecycleOwner,
-                        onBarcodeScanned = onBarcodeScanned
-                    )
-                    ScannerOverlay()
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(24.dp))
-                            .padding(28.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.CameraAlt,
-                            contentDescription = null,
-                            modifier = Modifier.size(42.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("Accès caméra nécessaire", style = MaterialTheme.typography.titleMedium)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            "Autorisez la caméra pour scanner les codes-barres.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                            Text("Autoriser la caméra")
-                        }
-                    }
-                }
-            }
-
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = when {
-                    statusMessage?.startsWith("✓") == true -> MaterialTheme.colorScheme.primaryContainer
-                    statusMessage?.startsWith("!") == true -> MaterialTheme.colorScheme.errorContainer
-                    else -> MaterialTheme.colorScheme.surfaceVariant
-                }
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = when {
-                            statusMessage?.startsWith("✓") == true -> Icons.Default.CheckCircle
-                            statusMessage?.startsWith("!") == true -> Icons.Default.ErrorOutline
-                            else -> Icons.Default.QrCodeScanner
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        statusMessage ?: "Placez le code dans le cadre. Le scan continue automatiquement.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DialogSurface(
-    onDismiss: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit
-) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
@@ -186,15 +65,112 @@ private fun DialogSurface(
                 .fillMaxHeight(0.90f),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.background,
-            tonalElevation = 0.dp,
-            content = content
-        )
+            tonalElevation = 0.dp
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(42.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Scanner les produits", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "Scannez plusieurs codes à la suite",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Fermer")
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp)
+                ) {
+                    if (cameraGranted) {
+                        ScannerCamera(lifecycleOwner = lifecycleOwner, onBarcodeScanned = onBarcodeScanned)
+                        ScannerOverlay()
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(24.dp))
+                                .padding(28.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Accès caméra nécessaire", style = MaterialTheme.typography.titleMedium)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                "Autorisez la caméra pour scanner les codes-barres.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                                Text("Autoriser la caméra")
+                            }
+                        }
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = when {
+                        statusMessage?.startsWith("✓") == true -> MaterialTheme.colorScheme.primaryContainer
+                        statusMessage?.startsWith("!") == true -> MaterialTheme.colorScheme.errorContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = when {
+                                statusMessage?.startsWith("✓") == true -> Icons.Default.CheckCircle
+                                statusMessage?.startsWith("!") == true -> Icons.Default.ErrorOutline
+                                else -> Icons.Default.QrCodeScanner
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            statusMessage ?: "Placez le code dans le cadre. Le scan continue automatiquement.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun ScannerCamera(
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner,
+    lifecycleOwner: LifecycleOwner,
     onBarcodeScanned: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -238,15 +214,12 @@ private fun ScannerCamera(
                     scanner.process(image)
                         .addOnSuccessListener { barcodes ->
                             val value = barcodes.firstNotNullOfOrNull { barcode ->
-                                barcode.rawValue?.takeIf {
-                                    barcode.format != Barcode.FORMAT_UNKNOWN && it.isNotBlank()
-                                }
+                                barcode.rawValue?.takeIf { barcode.format != Barcode.FORMAT_UNKNOWN && it.isNotBlank() }
                             } ?: return@addOnSuccessListener
 
                             val now = System.currentTimeMillis()
                             val previous = lastCode.get()
-                            val tooSoon = previous == value && now - lastScanAt.get() < 1100L
-                            if (!tooSoon) {
+                            if (previous != value || now - lastScanAt.get() >= 1100L) {
                                 lastCode.set(value)
                                 lastScanAt.set(now)
                                 onBarcodeScanned(value)
@@ -264,7 +237,7 @@ private fun ScannerCamera(
                         analysis
                     )
                 } catch (_: Exception) {
-                    // Camera binding errors are surfaced by the system; keep the sale flow usable.
+                    // Keep the POS usable even if the camera cannot be bound.
                 }
             }, ContextCompat.getMainExecutor(context))
         }
@@ -274,25 +247,22 @@ private fun ScannerCamera(
 @Composable
 private fun ScannerOverlay() {
     Box(modifier = Modifier.fillMaxSize()) {
-        Box(
+        Surface(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth(0.84f)
-                .height(170.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Transparent)
-            )
-            Text(
-                "Cadrez le code-barres",
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 10.dp),
-                color = Color.White,
-                style = MaterialTheme.typography.labelLarge
-            )
-        }
+                .height(170.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.Transparent,
+            border = androidx.compose.foundation.BorderStroke(2.dp, Color.White.copy(alpha = 0.88f))
+        ) {}
+        Text(
+            "Cadrez le code-barres",
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(top = 210.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge
+        )
     }
 }

@@ -60,9 +60,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
-      - name: Assemble release APK
+      - name: Assemble signed release
         working-directory: orange-money
+        env:
+          KEYSTORE_B64: ${{ secrets.SIRA_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.SIRA_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.SIRA_KEY_PASSWORD }}
         run: |
+          test -n "$KEYSTORE_B64" || { echo 'SIRA_KEYSTORE_B64 secret missing'; exit 1; }
+          printf '%s' "$KEYSTORE_B64" | base64 -d > my-upload-key.jks
           gradle assembleRelease -PversionCode=${GITHUB_RUN_NUMBER} -PversionName=${GITHUB_REF_NAME#v} --no-daemon --stacktrace
           test -s app/build/outputs/apk/release/app-release.apk
           cp app/build/outputs/apk/release/app-release.apk ../sira-orange-money-${GITHUB_REF_NAME#v}.apk

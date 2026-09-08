@@ -32,12 +32,16 @@ jobs:
           KEY_PASSWORD: ${{ secrets.SIRA_KEY_PASSWORD }}
         run: |
           test -n "$KEYSTORE_B64" || { echo 'SIRA_KEYSTORE_B64 secret missing'; exit 1; }
-          VERSION_NAME="${GITHUB_REF_NAME#v}"
-          VERSION_CODE=$(awk -F. '{printf "%d\n", ($1*10000)+($2*100)+$3}' <<< "$VERSION_NAME")
           printf '%s' "$KEYSTORE_B64" | base64 -d > my-upload-key.jks
-          gradle assembleRelease --no-daemon --stacktrace -PversionName="$VERSION_NAME" -PversionCode="$VERSION_CODE"
+          gradle assembleRelease --no-daemon --stacktrace
           test -s app/build/outputs/apk/release/app-release.apk
-          cp app/build/outputs/apk/release/app-release.apk "sira-business-${VERSION_NAME}.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sira-business-release
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+      - name: Rename Business APK
+        run: cp app/build/outputs/apk/release/app-release.apk sira-business-${GITHUB_REF_NAME#v}.apk
       - uses: actions/upload-artifact@v4
         with:
           name: sira-business-release-file
@@ -56,20 +60,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
-      - name: Assemble signed release
+      - name: Assemble release APK
         working-directory: orange-money
-        env:
-          KEYSTORE_B64: ${{ secrets.SIRA_KEYSTORE_B64 }}
-          STORE_PASSWORD: ${{ secrets.SIRA_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.SIRA_KEY_PASSWORD }}
         run: |
-          test -n "$KEYSTORE_B64" || { echo 'SIRA_KEYSTORE_B64 secret missing'; exit 1; }
-          VERSION_NAME="${GITHUB_REF_NAME#v}"
-          VERSION_CODE=$(awk -F. '{printf "%d\n", ($1*10000)+($2*100)+$3}' <<< "$VERSION_NAME")
-          printf '%s' "$KEYSTORE_B64" | base64 -d > my-upload-key.jks
-          gradle assembleRelease --no-daemon --stacktrace -PversionName="$VERSION_NAME" -PversionCode="$VERSION_CODE"
+          gradle assembleRelease -PversionCode=${GITHUB_RUN_NUMBER} -PversionName=${GITHUB_REF_NAME#v} --no-daemon --stacktrace
           test -s app/build/outputs/apk/release/app-release.apk
-          cp app/build/outputs/apk/release/app-release.apk "../sira-orange-money-${VERSION_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk ../sira-orange-money-${GITHUB_REF_NAME#v}.apk
       - uses: actions/upload-artifact@v4
         with:
           name: sira-orange-money-release-file
@@ -89,7 +85,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" sira-business-*.apk sira-orange-money-*.apk \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "SIRA Manager $GITHUB_REF_NAME" \
-            --notes "Mise à jour OTA obligatoire pour SIRA Business et SIRA Orange Money.\n\nChaque version plus récente est forcée par le service OTA."
+          gh release create "$GITHUB_REF_NAME" sira-business-*.apk sira-orange-money-*.apk --repo "$GITHUB_REPOSITORY" --title "SIRA Manager $GITHUB_REF_NAME" --notes "Mise à jour OTA obligatoire pour SIRA Business et SIRA Orange Money. Chaque version plus récente est forcée par le service OTA."

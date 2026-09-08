@@ -1,7 +1,6 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -41,6 +40,8 @@ fun NewSaleDialog(
     var notes by remember { mutableStateOf("") }
     var customerDropdownExpanded by remember { mutableStateOf(false) }
     var productSearch by remember { mutableStateOf("") }
+    var scannerOpen by remember { mutableStateOf(false) }
+    var scannerStatus by remember { mutableStateOf<String?>(null) }
     val cart = remember { mutableStateMapOf<Long, Int>() }
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.FRENCH) }
 
@@ -74,6 +75,13 @@ fun NewSaleDialog(
     val estimatedProfit = totalAmount - totalCost
     val totalItems = cartItems.sumOf { it.quantity }
 
+    LaunchedEffect(scannerStatus) {
+        if (scannerStatus != null) {
+            kotlinx.coroutines.delay(1400)
+            scannerStatus = null
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -96,13 +104,9 @@ fun NewSaleDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        Text("Nouvelle vente", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "Nouvelle vente",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Ajoutez les articles puis encaissez",
+                            "Ajoutez les articles puis encaissez",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -118,11 +122,7 @@ fun NewSaleDialog(
                     }
                 }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
@@ -148,18 +148,12 @@ fun NewSaleDialog(
                                     singleLine = true,
                                     shape = RoundedCornerShape(14.dp)
                                 )
-
                                 ExposedDropdownMenu(
                                     expanded = customerDropdownExpanded,
                                     onDismissRequest = { customerDropdownExpanded = false }
                                 ) {
                                     DropdownMenuItem(
-                                        text = {
-                                            Column {
-                                                Text("Client de passage", fontWeight = FontWeight.SemiBold)
-                                                Text("Paiement immédiat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                        },
+                                        text = { Text("Client de passage", fontWeight = FontWeight.SemiBold) },
                                         leadingIcon = { Icon(Icons.Default.PersonOutline, contentDescription = null) },
                                         onClick = {
                                             selectedCustomer = null
@@ -192,22 +186,35 @@ fun NewSaleDialog(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            OutlinedTextField(
-                                value = productSearch,
-                                onValueChange = { productSearch = it },
-                                modifier = Modifier.fillMaxWidth().testTag("product_search_input"),
-                                singleLine = true,
-                                shape = RoundedCornerShape(14.dp),
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                                trailingIcon = {
-                                    if (productSearch.isNotEmpty()) {
-                                        IconButton(onClick = { productSearch = "" }) {
-                                            Icon(Icons.Default.Clear, contentDescription = "Effacer la recherche")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(
+                                    value = productSearch,
+                                    onValueChange = { productSearch = it },
+                                    modifier = Modifier.weight(1f).testTag("product_search_input"),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(14.dp),
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                    trailingIcon = {
+                                        if (productSearch.isNotEmpty()) {
+                                            IconButton(onClick = { productSearch = "" }) {
+                                                Icon(Icons.Default.Clear, contentDescription = "Effacer la recherche")
+                                            }
                                         }
-                                    }
-                                },
-                                placeholder = { Text("Rechercher un produit ou scanner son code") }
-                            )
+                                    },
+                                    placeholder = { Text("Rechercher un produit ou un code") }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                FilledIconButton(
+                                    onClick = {
+                                        scannerStatus = null
+                                        scannerOpen = true
+                                    },
+                                    modifier = Modifier.size(56.dp),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scanner un code-barres")
+                                }
+                            }
                         }
                     }
                 }
@@ -215,25 +222,16 @@ fun NewSaleDialog(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Produits", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        "${visibleProducts.size} disponibles",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("${visibleProducts.size} disponibles", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 8.dp)
                 ) {
@@ -245,8 +243,7 @@ fun NewSaleDialog(
                             color = if (qty > 0) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.24f) else MaterialTheme.colorScheme.surface,
                             border = BorderStroke(
                                 1.dp,
-                                if (qty > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                                if (qty > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -262,38 +259,19 @@ fun NewSaleDialog(
                                         color = if (unavailable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
+                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.size(36.dp)) {
                                         IconButton(
-                                            onClick = {
-                                                if (qty > 1) cart[product.id] = qty - 1 else cart.remove(product.id)
-                                            },
+                                            onClick = { if (qty > 1) cart[product.id] = qty - 1 else cart.remove(product.id) },
                                             enabled = qty > 0
-                                        ) {
-                                            Icon(Icons.Default.Remove, contentDescription = "Retirer")
-                                        }
+                                        ) { Icon(Icons.Default.Remove, contentDescription = "Retirer") }
                                     }
-                                    Text(
-                                        qty.toString(),
-                                        modifier = Modifier.padding(horizontal = 12.dp),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
+                                    Text(qty.toString(), modifier = Modifier.padding(horizontal = 12.dp), fontWeight = FontWeight.Bold)
+                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp)) {
                                         IconButton(
                                             onClick = { if (!unavailable && qty < product.quantity) cart[product.id] = qty + 1 },
                                             enabled = !unavailable && qty < product.quantity
-                                        ) {
-                                            Icon(Icons.Default.Add, contentDescription = "Ajouter", tint = Color.White)
-                                        }
+                                        ) { Icon(Icons.Default.Add, contentDescription = "Ajouter", tint = Color.White) }
                                     }
                                 }
                             }
@@ -313,7 +291,7 @@ fun NewSaleDialog(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Règlement", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                                 Text(
-                                    "${totalItems} article(s) • ${numberFormat.format(totalAmount.toLong())} FCFA",
+                                    "$totalItems article(s) • ${numberFormat.format(totalAmount.toLong())} FCFA",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -361,8 +339,7 @@ fun NewSaleDialog(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         "${currentPaymentEngine.displayName} • " +
-                                            if (!currentPaymentEngine.isConfigured()) "Vérifiez le SMS de confirmation avant remise."
-                                            else "Moteur connecté.",
+                                            if (!currentPaymentEngine.isConfigured()) "Vérifiez le SMS de confirmation avant remise." else "Moteur connecté.",
                                         style = MaterialTheme.typography.labelSmall
                                     )
                                 }
@@ -407,5 +384,31 @@ fun NewSaleDialog(
                 }
             }
         }
+    }
+
+    if (scannerOpen) {
+        BarcodeScannerDialog(
+            statusMessage = scannerStatus,
+            onBarcodeScanned = { scannedCode ->
+                val normalizedCode = scannedCode.trim()
+                val product = products.firstOrNull { it.barcode?.trim().equals(normalizedCode, ignoreCase = true) }
+                when {
+                    product == null -> {
+                        scannerStatus = "! Code $normalizedCode : produit introuvable"
+                    }
+                    product.quantity <= 0 -> {
+                        scannerStatus = "! ${product.name} : stock épuisé"
+                    }
+                    (cart[product.id] ?: 0) >= product.quantity -> {
+                        scannerStatus = "! ${product.name} : stock maximum atteint"
+                    }
+                    else -> {
+                        cart[product.id] = (cart[product.id] ?: 0) + 1
+                        scannerStatus = "✓ ${product.name} ajouté • stock ${product.quantity - (cart[product.id] ?: 0)}"
+                    }
+                }
+            },
+            onDismiss = { scannerOpen = false }
+        )
     }
 }

@@ -12,7 +12,7 @@ import java.util.UUID
 class OrangeLicenseClient(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("sira_orange_license", Context.MODE_PRIVATE)
     val deviceId: String = prefs.getString("device_id", null) ?: ("OM-DEV-" + UUID.randomUUID().toString().take(12).uppercase()).also { prefs.edit().putString("device_id", it).apply() }
-    private val base = "https://sira.dev"
+    private val base = "https://sira-website-doma1.vercel.app"
 
     suspend fun activate(key: String): Result<String> = withContext(Dispatchers.IO) {
         try {
@@ -22,7 +22,8 @@ class OrangeLicenseClient(context: Context) {
             conn.setRequestProperty("Content-Type", "application/json")
             conn.outputStream.use { it.write(body.toString().toByteArray()) }
             val code = conn.responseCode
-            val text = (if (code in 200..299) conn.inputStream else conn.errorStream).bufferedReader().use { it.readText() }
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val text = stream.bufferedReader().use { it.readText() }
             if (code !in 200..299) return@withContext Result.failure(Exception(JSONObject(text).optString("error", "Licence invalide.")))
             val json = JSONObject(text)
             if (!json.optBoolean("valid")) return@withContext Result.failure(Exception(json.optString("error", "Licence invalide.")))

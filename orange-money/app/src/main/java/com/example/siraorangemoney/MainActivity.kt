@@ -18,19 +18,21 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.sira.orangemoney.update.AppAutoUpdate
 
 class MainActivity : ComponentActivity() {
     private val store by lazy { OrangeLocalStore(this) }
     private val licenseClient by lazy { OrangeLicenseClient(this) }
+    private val updateClient by lazy { AppAutoUpdate(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { SiraOrangeMoneyApp(store, licenseClient) }
+        setContent { SiraOrangeMoneyApp(store, licenseClient, updateClient) }
     }
 }
 
 @Composable
-private fun SiraOrangeMoneyApp(store: OrangeLocalStore, licenseClient: OrangeLicenseClient) {
+private fun SiraOrangeMoneyApp(store: OrangeLocalStore, licenseClient: OrangeLicenseClient, updateClient: AppAutoUpdate) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var transactions by remember { mutableStateOf(store.all()) }
     var query by remember { mutableStateOf("") }
@@ -40,14 +42,12 @@ private fun SiraOrangeMoneyApp(store: OrangeLocalStore, licenseClient: OrangeLic
     var licenseInput by remember { mutableStateOf(licenseClient.cachedLicenseKey.orEmpty()) }
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
-    var mandatoryUpdate by remember { mutableStateOf<Any?>(null) }
+    var mandatoryUpdate by remember { mutableStateOf<AppAutoUpdate.UpdateInfo?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         mandatoryUpdate = withContext(Dispatchers.IO) {
-            runCatching { com.sira.orangemoney.update.AppAutoUpdate(licenseClientContext(store)).check() }
-                .getOrNull()
-                ?.takeIf { it.mandatory }
+            runCatching { updateClient.check() }.getOrNull()?.takeIf { it.mandatory }
         }
     }
 
@@ -147,8 +147,7 @@ private fun SiraOrangeMoneyApp(store: OrangeLocalStore, licenseClient: OrangeLic
         }
     }
 
-    if (mandatoryUpdate != null) {
-        val info = mandatoryUpdate as com.sira.orangemoney.update.AppAutoUpdate.UpdateInfo
+    mandatoryUpdate?.let { info ->
         AlertDialog(
             onDismissRequest = {},
             title = { Text(info.title.ifBlank { "Mise à jour obligatoire" }) },
@@ -156,16 +155,12 @@ private fun SiraOrangeMoneyApp(store: OrangeLocalStore, licenseClient: OrangeLic
             confirmButton = {
                 Button(onClick = {
                     scope.launch {
-                        withContext(Dispatchers.IO) { com.sira.orangemoney.update.AppAutoUpdate(licenseClientContext(store)).downloadAndInstall(info) }
+                        withContext(Dispatchers.IO) { updateClient.downloadAndInstall(info) }
                     }
                 }) { Text("Mettre à jour maintenant") }
             }
         )
     }
-}
-
-private fun licenseClientContext(store: OrangeLocalStore): android.content.Context {
-    return store.writableDatabase.path.let { store.javaClass.getDeclaredField("mContext").apply { isAccessible = true }.get(store) as android.content.Context }
 }
 
 @Composable

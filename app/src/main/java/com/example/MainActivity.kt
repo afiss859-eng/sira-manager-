@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                                 SiraNavTab.INTELLIGENCE -> SiraAiScreen(viewModel = viewModel)
-                                SiraNavTab.ADMIN_CENTER -> AdminControlCenterScreen(
+                                SiraNavTab.ADMIN_CENTER -> AdminDashboardScreen(
                                     viewModel = viewModel,
                                     onOpenTerms = { showTermsDialog = true },
                                     onOpenAuth = { showGoogleAuthDialog = true }

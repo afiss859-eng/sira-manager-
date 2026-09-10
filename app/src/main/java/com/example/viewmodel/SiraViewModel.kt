@@ -25,8 +25,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+
 enum class SiraNavTab(val title: String) {
-    DASHBOARD("Tableau"), STOCK("Stock"), VENTES("Ventes"), CAISSE("Caisse"), PARTENAIRES("Clients"), INTELLIGENCE("SIRA IA"), ADMIN_CENTER("Admin Web"), PARAMETRES("Plus")
+    DASHBOARD("Tableau"), STOCK("Stock"), QR_CODES("QR produits"), VENTES("Ventes"), CAISSE("Caisse"), PARTENAIRES("Clients"), INTELLIGENCE("SIRA IA"), ADMIN_CENTER("Admin Web"), PARAMETRES("Plus")
 }
 
 data class MerchantProfile(
@@ -83,6 +84,7 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     fun checkLicenseStatus() { viewModelScope.launch { licenseConfig.value.key.takeIf { it.isNotBlank() }?.let { licenseManager.validateKeyOnline(it) } } }
     val products = _repository.flatMapLatest { it.allProducts }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val lowStockProducts = _repository.flatMapLatest { it.lowStockProducts }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val productQrCodes = _repository.flatMapLatest { it.allProductQrCodes }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val sales = _repository.flatMapLatest { it.allSales }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val saleItems = _repository.flatMapLatest { it.allSaleItems }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val purchases = _repository.flatMapLatest { it.allPurchases }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -101,6 +103,15 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     fun quickStockAdjust(productId: Long, delta: Int) { viewModelScope.launch { _repository.value.adjustProductStock(productId, delta) } }
     fun saveProduct(product: Product) { viewModelScope.launch { if (product.id == 0L) _repository.value.insertProduct(product) else _repository.value.updateProduct(product) } }
     fun deleteProduct(product: Product) { viewModelScope.launch { _repository.value.deleteProduct(product) } }
+    fun saveProductQrCode(product: Product?, price: Double) {
+        if (product == null || price <= 0) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val payload = "{\"v\":1,\"type\":\"SIRA_PRODUCT\",\"productId\":${product.id},\"name\":${jsonString(product.name)},\"price\":$price,\"currency\":\"XOF\"}"
+            _repository.value.insertProductQrCode(ProductQrCode(productId = product.id, productName = product.name, price = price, currency = "XOF", payload = payload))
+        }
+    }
+    fun deleteProductQrCode(code: ProductQrCode) { viewModelScope.launch(Dispatchers.IO) { _repository.value.deleteProductQrCode(code) } }
+    private fun jsonString(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
     fun setDefaultBluetoothPrinter(macAddress: String) { bluetoothPrinter.setDefaultPrinter(macAddress); _defaultPrinterMac.value = bluetoothPrinter.getDefaultPrinterMac(); _printStatus.value = "Imprimante configurée : $macAddress"; retryPendingReceiptPrints() }
     fun clearPrintStatus() { _printStatus.value = null }
     private fun enqueueReceiptPrint(sale: Sale, items: List<SaleItem>) { printQueue.enqueue(sale, items); _pendingPrintCount.value = printQueue.pendingCount(); retryPendingReceiptPrints() }
@@ -110,10 +121,7 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
             if (pending.isEmpty()) { _pendingPrintCount.value = 0; return@launch }
             _printStatus.value = "Tentative d'impression de ${pending.size} reçu(s)…"
             val remaining = mutableListOf<Pair<Sale, List<SaleItem>>>()
-            for (receipt in pending) {
-                val result = bluetoothPrinter.printSale(receipt.first, receipt.second)
-                if (result.isFailure) remaining += receipt
-            }
+            for (receipt in pending) { val result = bluetoothPrinter.printSale(receipt.first, receipt.second); if (result.isFailure) remaining += receipt }
             printQueue.replace(remaining); _pendingPrintCount.value = remaining.size
             _printStatus.value = if (remaining.isEmpty()) "Reçu(s) imprimé(s) automatiquement" else "${remaining.size} reçu(s) en attente d'impression"
         }

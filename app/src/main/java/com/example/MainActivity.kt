@@ -55,11 +55,7 @@ class MainActivity : ComponentActivity() {
                 val licenseConfig by viewModel.licenseConfig.collectAsState()
 
                 if (!licenseConfig.isActivated || licenseConfig.isRevoked) {
-                    AppActivationScreen(
-                        viewModel = viewModel,
-                        licenseConfig = licenseConfig,
-                        onActivated = { }
-                    )
+                    AppActivationScreen(viewModel = viewModel, licenseConfig = licenseConfig, onActivated = { })
                 } else {
                     val currentTab by viewModel.currentTab.collectAsState()
                     val currentUser by viewModel.currentUser.collectAsState()
@@ -86,76 +82,29 @@ class MainActivity : ComponentActivity() {
                         containerColor = SleekBackground,
                         topBar = {
                             Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(SleekSurface.copy(alpha = 0.98f))
-                                    .statusBarsPadding()
-                                    .padding(horizontal = 18.dp, vertical = 9.dp)
+                                modifier = Modifier.fillMaxWidth().background(SleekSurface.copy(alpha = 0.98f)).statusBarsPadding().padding(horizontal = 18.dp, vertical = 9.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        LicensedImage(
-                                            url = licenseConfig.logoUrl,
-                                            fallbackRes = R.drawable.sira_logo,
-                                            contentDescription = "Logo de l'organisation",
-                                            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(12.dp))
-                                        )
+                                        LicensedImage(url = licenseConfig.logoUrl, fallbackRes = R.drawable.sira_logo, contentDescription = "Logo de l'organisation", modifier = Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)))
                                         Spacer(Modifier.width(10.dp))
                                         Column {
-                                            Text(
-                                                text = licenseConfig.appName.ifBlank { "SIRA Business" },
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                letterSpacing = (-0.35).sp,
-                                                color = SleekTextPrimary
-                                            )
-                                            Text(
-                                                text = "${profile.shopName} • ${profile.city} • ${licenseConfig.stockModel}",
-                                                fontSize = 10.sp,
-                                                color = SleekTextSecondary
-                                            )
+                                            Text(licenseConfig.appName.ifBlank { "SIRA Business" }, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.35).sp, color = SleekTextPrimary)
+                                            Text("${profile.shopName} • ${profile.city} • ${licenseConfig.stockModel}", fontSize = 10.sp, color = SleekTextSecondary)
                                         }
                                     }
-
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(onClick = { showTermsDialog = true }, modifier = Modifier.size(36.dp)) {
-                                            Icon(Icons.Default.Gavel, contentDescription = "CGU & Politique", tint = SleekTextSecondary, modifier = Modifier.size(19.dp))
-                                        }
+                                        IconButton(onClick = { showTermsDialog = true }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Gavel, contentDescription = "CGU & Politique", tint = SleekTextSecondary, modifier = Modifier.size(19.dp)) }
                                         IconButton(onClick = { viewModel.performCloudSync() }, modifier = Modifier.size(36.dp).testTag("top_bar_sync_button")) {
-                                            if (isSyncing) {
-                                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = accent)
-                                            } else {
-                                                Icon(Icons.Default.CloudSync, contentDescription = "Synchro Cloud", tint = accent, modifier = Modifier.size(20.dp))
-                                            }
+                                            if (isSyncing) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = accent)
+                                            else Icon(Icons.Default.CloudSync, contentDescription = "Synchro Cloud", tint = accent, modifier = Modifier.size(20.dp))
                                         }
                                         Spacer(Modifier.width(3.dp))
-                                        LicensedImage(
-                                            url = licenseConfig.profilePhotoUrl,
-                                            fallbackRes = R.drawable.sira_logo,
-                                            contentDescription = "Profil de l'organisation",
-                                            modifier = Modifier.size(36.dp).clip(CircleShape),
-                                            contentScale = ContentScale.Crop,
-                                            fallbackTint = if (currentUser.role == SiraRole.SUPER_ADMIN) accent else SleekSecondary
-                                        )
+                                        LicensedImage(url = licenseConfig.profilePhotoUrl, fallbackRes = R.drawable.sira_logo, contentDescription = "Profil de l'organisation", modifier = Modifier.size(36.dp).clip(CircleShape), contentScale = ContentScale.Crop, fallbackTint = if (currentUser.role == SiraRole.SUPER_ADMIN) accent else SleekSecondary)
                                     }
                                 }
-
                                 Spacer(Modifier.height(9.dp))
-
-                                Surface(
-                                    shape = SiraPillShape,
-                                    color = SleekSurfaceVariant,
-                                    border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.45f)),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(40.dp)
-                                        .clickable { showGlobalSearch = true }
-                                        .testTag("top_search_bar_trigger")
-                                ) {
+                                Surface(shape = SiraPillShape, color = SleekSurfaceVariant, border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.45f)), modifier = Modifier.fillMaxWidth().height(40.dp).clickable { showGlobalSearch = true }.testTag("top_search_bar_trigger")) {
                                     Row(Modifier.fillMaxSize().padding(horizontal = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.Search, contentDescription = "Rechercher", tint = SleekTextSecondary, modifier = Modifier.size(18.dp))
                                         Spacer(Modifier.width(8.dp))
@@ -164,90 +113,30 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         },
-                        bottomBar = {
-                            SiraBottomDock(currentTab = currentTab, onTabSelected = viewModel::selectTab)
-                        }
+                        bottomBar = { SiraBottomDock(currentTab = currentTab, onTabSelected = viewModel::selectTab) }
                     ) { innerPadding ->
-                        Box(
-                            modifier = Modifier.fillMaxSize().padding(innerPadding)
-                        ) {
+                        Box(Modifier.fillMaxSize().padding(innerPadding)) {
                             when (currentTab) {
-                                SiraNavTab.DASHBOARD -> DashboardScreen(
-                                    viewModel = viewModel,
-                                    onOpenNewSale = { showNewSaleDialog = true },
-                                    onOpenAddProduct = {
-                                        productToEdit = null
-                                        showAddEditProductDialog = true
-                                    },
-                                    onOpenCashOp = { showCashOpDialog = true },
-                                    onOpenGlobalSearch = { showGlobalSearch = true },
-                                    onNavigateToTab = { viewModel.selectTab(it) },
-                                    onViewSaleInvoice = { viewModel.showInvoiceForSale(it) }
-                                )
-                                SiraNavTab.STOCK -> InventoryScreen(
-                                    viewModel = viewModel,
-                                    onAddProductClick = {
-                                        productToEdit = null
-                                        showAddEditProductDialog = true
-                                    },
-                                    onEditProductClick = {
-                                        productToEdit = it
-                                        showAddEditProductDialog = true
-                                    }
-                                )
-                                SiraNavTab.VENTES -> SalesPurchasesScreen(
-                                    viewModel = viewModel,
-                                    onNewSaleClick = { showNewSaleDialog = true },
-                                    onViewSaleInvoice = { viewModel.showInvoiceForSale(it) }
-                                )
-                                SiraNavTab.CAISSE -> CashflowScreen(
-                                    viewModel = viewModel,
-                                    onNewCashOpClick = { showCashOpDialog = true }
-                                )
-                                SiraNavTab.PARTENAIRES -> PartenairesScreen(
-                                    viewModel = viewModel,
-                                    onAddCustomerClick = {
-                                        customerToEdit = null
-                                        showKycCustomerDialog = true
-                                    },
-                                    onEditCustomerClick = {
-                                        customerToEdit = it
-                                        showKycCustomerDialog = true
-                                    }
-                                )
+                                SiraNavTab.DASHBOARD -> DashboardScreen(viewModel = viewModel, onOpenNewSale = { showNewSaleDialog = true }, onOpenAddProduct = { productToEdit = null; showAddEditProductDialog = true }, onOpenCashOp = { showCashOpDialog = true }, onOpenGlobalSearch = { showGlobalSearch = true }, onNavigateToTab = { viewModel.selectTab(it) }, onViewSaleInvoice = { viewModel.showInvoiceForSale(it) })
+                                SiraNavTab.STOCK -> InventoryScreen(viewModel = viewModel, onAddProductClick = { productToEdit = null; showAddEditProductDialog = true }, onEditProductClick = { productToEdit = it; showAddEditProductDialog = true })
+                                SiraNavTab.QR_CODES -> ProductQrScreen(viewModel = viewModel)
+                                SiraNavTab.VENTES -> SalesPurchasesScreen(viewModel = viewModel, onNewSaleClick = { showNewSaleDialog = true }, onViewSaleInvoice = { viewModel.showInvoiceForSale(it) })
+                                SiraNavTab.CAISSE -> CashflowScreen(viewModel = viewModel, onNewCashOpClick = { showCashOpDialog = true })
+                                SiraNavTab.PARTENAIRES -> PartenairesScreen(viewModel = viewModel, onAddCustomerClick = { customerToEdit = null; showKycCustomerDialog = true }, onEditCustomerClick = { customerToEdit = it; showKycCustomerDialog = true })
                                 SiraNavTab.INTELLIGENCE -> SiraAiScreen(viewModel = viewModel)
-                                SiraNavTab.ADMIN_CENTER -> AdminDashboardScreen(
-                                    viewModel = viewModel,
-                                    onOpenTerms = { showTermsDialog = true },
-                                    onOpenAuth = { showGoogleAuthDialog = true }
-                                )
+                                SiraNavTab.ADMIN_CENTER -> AdminDashboardScreen(viewModel = viewModel, onOpenTerms = { showTermsDialog = true }, onOpenAuth = { showGoogleAuthDialog = true })
                                 SiraNavTab.PARAMETRES -> SettingsScreen(viewModel = viewModel)
                             }
                         }
                     }
-
-                    if (showGlobalSearch) {
-                        GlobalSearchDialog(viewModel = viewModel, onDismiss = { showGlobalSearch = false }, onNavigateToTab = { tab -> viewModel.selectTab(tab); showGlobalSearch = false }, onSelectSale = { sale -> viewModel.showInvoiceForSale(sale); showGlobalSearch = false })
-                    }
-                    if (showNewSaleDialog) {
-                        NewSaleDialog(products = products, customers = customers, currentPaymentEngine = currentEngine, onDismiss = { showNewSaleDialog = false }, onCompleteSale = { sale, items -> viewModel.completeSale(sale, items); showNewSaleDialog = false })
-                    }
-                    if (showAddEditProductDialog) {
-                        AddEditProductDialog(initialProduct = productToEdit, onDismiss = { showAddEditProductDialog = false }, onSave = { product -> viewModel.saveProduct(product); showAddEditProductDialog = false })
-                    }
-                    if (showKycCustomerDialog) {
-                        KycCustomerDialog(initialCustomer = customerToEdit, viewModel = viewModel, onDismiss = { showKycCustomerDialog = false }, onSave = { customer -> viewModel.saveCustomer(customer); showKycCustomerDialog = false })
-                    }
-                    if (showCashOpDialog) {
-                        CashOperationDialog(onDismiss = { showCashOpDialog = false }, onSave = { tx -> viewModel.recordCashOp(tx); showCashOpDialog = false })
-                    }
+                    if (showGlobalSearch) GlobalSearchDialog(viewModel = viewModel, onDismiss = { showGlobalSearch = false }, onNavigateToTab = { tab -> viewModel.selectTab(tab); showGlobalSearch = false }, onSelectSale = { sale -> viewModel.showInvoiceForSale(sale); showGlobalSearch = false })
+                    if (showNewSaleDialog) NewSaleDialog(products = products, customers = customers, currentPaymentEngine = currentEngine, onDismiss = { showNewSaleDialog = false }, onCompleteSale = { sale, items -> viewModel.completeSale(sale, items); showNewSaleDialog = false })
+                    if (showAddEditProductDialog) AddEditProductDialog(initialProduct = productToEdit, onDismiss = { showAddEditProductDialog = false }, onSave = { product -> viewModel.saveProduct(product); showAddEditProductDialog = false })
+                    if (showKycCustomerDialog) KycCustomerDialog(initialCustomer = customerToEdit, viewModel = viewModel, onDismiss = { showKycCustomerDialog = false }, onSave = { customer -> viewModel.saveCustomer(customer); showKycCustomerDialog = false })
+                    if (showCashOpDialog) CashOperationDialog(onDismiss = { showCashOpDialog = false }, onSave = { tx -> viewModel.recordCashOp(tx); showCashOpDialog = false })
                     lastInvoice?.let { (sale, items) -> ReceiptDialog(sale = sale, items = items, profile = profile, onDismiss = { viewModel.closeInvoiceDialog() }) }
-                    if (showGoogleAuthDialog) {
-                        GoogleAuthDialog(authManager = viewModel.authManager, onDismiss = { showGoogleAuthDialog = false }, onUserSwitched = { newUser -> viewModel.switchUser(newUser) })
-                    }
-                    if (showTermsDialog) {
-                        TermsAndPrivacyDialog(onDismiss = { showTermsDialog = false })
-                    }
+                    if (showGoogleAuthDialog) GoogleAuthDialog(authManager = viewModel.authManager, onDismiss = { showGoogleAuthDialog = false }, onUserSwitched = { newUser -> viewModel.switchUser(newUser) })
+                    if (showTermsDialog) TermsAndPrivacyDialog(onDismiss = { showTermsDialog = false })
                 }
             }
         }
@@ -255,14 +144,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun LicensedImage(
-    url: String,
-    fallbackRes: Int,
-    contentDescription: String?,
-    modifier: Modifier,
-    contentScale: ContentScale = ContentScale.Crop,
-    fallbackTint: Color = SleekBluePrimary
-) {
+private fun LicensedImage(url: String, fallbackRes: Int, contentDescription: String?, modifier: Modifier, contentScale: ContentScale = ContentScale.Crop, fallbackTint: Color = SleekBluePrimary) {
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = url) {
         value = if (url.isBlank()) null else withContext(Dispatchers.IO) {
             runCatching {
@@ -270,18 +152,12 @@ private fun LicensedImage(
                 conn.connectTimeout = 4000
                 conn.readTimeout = 4000
                 conn.doInput = true
-                conn.inputStream.use { BitmapFactory.decodeStream(it) }
-                    .also { conn.disconnect() }
+                conn.inputStream.use { BitmapFactory.decodeStream(it) }.also { conn.disconnect() }
             }.getOrNull()
         }
     }
-    if (bitmap != null) {
-        Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = contentDescription, modifier = modifier, contentScale = contentScale)
-    } else {
-        Box(modifier = modifier.background(fallbackTint, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-            Image(painter = painterResource(id = fallbackRes), contentDescription = contentDescription, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), contentScale = contentScale)
-        }
-    }
+    if (bitmap != null) Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = contentDescription, modifier = modifier, contentScale = contentScale)
+    else Box(modifier = modifier.background(fallbackTint, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Image(painter = painterResource(id = fallbackRes), contentDescription = contentDescription, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), contentScale = contentScale) }
 }
 
 private fun parseThemeColor(hex: String): Color = runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(SleekBluePrimary)
@@ -291,6 +167,7 @@ private fun SiraBottomDock(currentTab: SiraNavTab, onTabSelected: (SiraNavTab) -
     val items = listOf(
         SiraDockItem(SiraNavTab.DASHBOARD, Icons.Default.Home, "Accueil", "nav_dashboard"),
         SiraDockItem(SiraNavTab.STOCK, Icons.Default.Inventory2, "Stock", "nav_stock"),
+        SiraDockItem(SiraNavTab.QR_CODES, Icons.Default.QrCode2, "QR", "nav_qr_codes"),
         SiraDockItem(SiraNavTab.VENTES, Icons.Default.ReceiptLong, "Ventes", "nav_ventes"),
         SiraDockItem(SiraNavTab.CAISSE, Icons.Default.AccountBalanceWallet, "Caisse", "nav_caisse"),
         SiraDockItem(SiraNavTab.PARTENAIRES, Icons.Default.People, "Clients", "nav_partenaires"),
@@ -298,17 +175,17 @@ private fun SiraBottomDock(currentTab: SiraNavTab, onTabSelected: (SiraNavTab) -
         SiraDockItem(SiraNavTab.PARAMETRES, Icons.Default.Settings, "Plus", "nav_parametres")
     )
     Surface(color = SleekSurface.copy(alpha = 0.98f), shadowElevation = 6.dp, tonalElevation = 0.dp, border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.72f)), modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 7.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
-            items.forEach { item ->
-                val selected = currentTab == item.tab
-                Column(modifier = Modifier.weight(1f).testTag(item.tag).clickable { onTabSelected(item.tab) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(shape = SiraPillShape, color = if (selected) SleekBlueContainer else Color.Transparent, modifier = Modifier.height(32.dp).fillMaxWidth()) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(item.icon, contentDescription = item.label, tint = if (selected) SleekBlueOnContainer else SleekTextTertiary, modifier = Modifier.size(if (selected) 20.dp else 19.dp))
+        androidx.compose.foundation.horizontalScroll(rememberScrollState()).let { scrollModifier ->
+            Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 7.dp).then(scrollModifier), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+                items.forEach { item ->
+                    val selected = currentTab == item.tab
+                    Column(modifier = Modifier.width(54.dp).testTag(item.tag).clickable { onTabSelected(item.tab) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(shape = SiraPillShape, color = if (selected) SleekBlueContainer else Color.Transparent, modifier = Modifier.height(32.dp).fillMaxWidth()) {
+                            Box(contentAlignment = Alignment.Center) { Icon(item.icon, contentDescription = item.label, tint = if (selected) SleekBlueOnContainer else SleekTextTertiary, modifier = Modifier.size(if (selected) 20.dp else 19.dp)) }
                         }
+                        Spacer(Modifier.height(2.dp))
+                        Text(item.label, fontSize = 8.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, color = if (selected) SleekBlueOnContainer else SleekTextTertiary, maxLines = 1)
                     }
-                    Spacer(Modifier.height(2.dp))
-                    Text(item.label, fontSize = 8.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, color = if (selected) SleekBlueOnContainer else SleekTextTertiary, maxLines = 1)
                 }
             }
         }

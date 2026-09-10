@@ -11,5 +11,6 @@ data class ProductQrCode(
     val price: Double,
     val currency: String = "XOF",
     val payload: String,
+    val variant: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )

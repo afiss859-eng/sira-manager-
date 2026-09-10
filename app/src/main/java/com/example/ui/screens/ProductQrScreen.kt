@@ -22,7 +22,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -32,7 +31,6 @@ import androidx.compose.ui.unit.sp
 import com.example.data.ProductQrBackup
 import com.example.data.ProductQrStats
 import com.example.data.entity.ProductQrCode
-import com.example.data.importProductQrCsv
 import com.example.printer.SiraBluetoothPrinter
 import com.example.ui.components.BarcodeScannerDialog
 import com.example.ui.theme.*
@@ -66,12 +64,12 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
         if (uri != null) runCatching {
             context.contentResolver.openOutputStream(uri)?.use { out -> out.writer().use { writer -> writer.write(ProductQrBackup.toCsv(savedCodes)) } } ?: error("Fichier inaccessible")
         }.onSuccess { Toast.makeText(context, "Sauvegarde QR exportée", Toast.LENGTH_SHORT).show() }
-         .onFailure { Toast.makeText(context, it.message ?: "Export impossible", Toast.LENGTH_SHORT).show() }
+            .onFailure { Toast.makeText(context, it.message ?: "Export impossible", Toast.LENGTH_SHORT).show() }
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             runCatching { context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("Fichier inaccessible") }
-                .onSuccess { csv -> scope.launch { val count = viewModel.importProductQrCsv(csv); Toast.makeText(context, "$count QR restauré(s) sans doublon", Toast.LENGTH_LONG).show() } }
+                .onSuccess { csv -> val count = viewModel.importProductQrCsv(csv); Toast.makeText(context, "$count QR restauré(s) sans doublon", Toast.LENGTH_LONG).show() }
                 .onFailure { Toast.makeText(context, it.message ?: "Restauration impossible", Toast.LENGTH_SHORT).show() }
         }
     }
@@ -82,7 +80,7 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
             productName = it.productName
             variant = it.variant
             priceText = it.price.toLong().toString()
-            category = viewModel.products.value.firstOrNull { p -> p.id == editing?.productId }?.category.orEmpty()
+            category = viewModel.products.value.firstOrNull { p -> p.id == it.productId }?.category.orEmpty()
         }
     }
 
@@ -113,52 +111,54 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Surface(SiraCardShape, SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .65f)), Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatChip("QR", savedCodes.size.toString(), Modifier.weight(1f))
-                    StatChip("Variantes", savedCodes.count { it.variant.isNotBlank() }.toString(), Modifier.weight(1f))
-                    StatChip("Scans", topScanned.sumOf { it.second }.toString(), Modifier.weight(1f))
+            Surface(modifier = Modifier.fillMaxWidth(), shape = SiraCardShape, color = SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .65f))) {
+                Column {
+                    Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatChip("QR", savedCodes.size.toString(), Modifier.weight(1f))
+                        StatChip("Variantes", savedCodes.count { it.variant.isNotBlank() }.toString(), Modifier.weight(1f))
+                        StatChip("Scans", topScanned.sumOf { it.second }.toString(), Modifier.weight(1f))
+                    }
+                    if (topScanned.isNotEmpty()) Text("Plus scannés : " + topScanned.joinToString(" • ") { payload -> "${savedCodes.firstOrNull { it.payload == payload.first }?.productName ?: payload.first} (${payload.second})" }, fontSize = 9.sp, color = SleekTextSecondary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp).padding(bottom = 10.dp), maxLines = 2)
                 }
-                if (topScanned.isNotEmpty()) Text("Plus scannés : " + topScanned.joinToString(" • ") { payload -> "${savedCodes.firstOrNull { it.payload == payload.first }?.productName ?: payload.first} (${payload.second})" }, fontSize = 9.sp, color = SleekTextSecondary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp).padding(bottom = 10.dp), maxLines = 2)
             }
             Spacer(Modifier.height(12.dp))
-            Surface(SiraCardShape, SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .65f)), Modifier.fillMaxWidth()) {
+            Surface(modifier = Modifier.fillMaxWidth(), shape = SiraCardShape, color = SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .65f))) {
                 Column(Modifier.padding(15.dp)) {
                     Text(if (editing == null) "Préparer un QR produit" else "Modifier le QR produit", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SleekTextPrimary)
                     Text("La référence reste le payload du QR : aucune connexion réseau n'est nécessaire à la caisse.", fontSize = 10.sp, color = SleekTextSecondary, modifier = Modifier.padding(top = 3.dp))
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(value = scannedCode, onValueChange = { scannedCode = it }, Modifier.weight(1f).testTag("qr_scanned_code"), label = { Text("Code / référence") }, singleLine = true)
+                        OutlinedTextField(value = scannedCode, onValueChange = { scannedCode = it }, modifier = Modifier.weight(1f).testTag("qr_scanned_code"), label = { Text("Code / référence") }, singleLine = true)
                         Spacer(Modifier.width(8.dp))
-                        FilledIconButton(onClick = { scannerStatus = null; scannerOpen = true }, Modifier.size(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.QrCodeScanner, "Scanner") }
+                        FilledIconButton(onClick = { scannerStatus = null; scannerOpen = true }, modifier = Modifier.size(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.QrCodeScanner, "Scanner") }
                     }
                     scannerStatus?.let { Text(it, fontSize = 10.sp, color = if (it.startsWith("!")) SleekError else SleekBluePrimary, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp)) }
                     Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), Modifier.fillMaxWidth()) {
-                        OutlinedTextField(value = productName, onValueChange = { productName = it }, Modifier.weight(1f).testTag("qr_product_name"), label = { Text("Nom") }, singleLine = true)
-                        OutlinedTextField(value = variant, onValueChange = { variant = it }, Modifier.weight(.78f), label = { Text("Variante") }, placeholder = { Text("1L, Rouge…") }, singleLine = true)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(value = productName, onValueChange = { productName = it }, modifier = Modifier.weight(1f).testTag("qr_product_name"), label = { Text("Nom") }, singleLine = true)
+                        OutlinedTextField(value = variant, onValueChange = { variant = it }, modifier = Modifier.weight(.78f), label = { Text("Variante") }, placeholder = { Text("1L, Rouge…") }, singleLine = true)
                     }
                     Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), Modifier.fillMaxWidth()) {
-                        OutlinedTextField(value = category, onValueChange = { category = it }, Modifier.weight(1f), label = { Text("Catégorie") }, singleLine = true)
-                        OutlinedTextField(value = stockText, onValueChange = { stockText = it.filter(Char::isDigit) }, Modifier.weight(.62f), label = { Text("Stock initial") }, singleLine = true)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(value = category, onValueChange = { category = it }, modifier = Modifier.weight(1f), label = { Text("Catégorie") }, singleLine = true)
+                        OutlinedTextField(value = stockText, onValueChange = { stockText = it.filter(Char::isDigit) }, modifier = Modifier.weight(.62f), label = { Text("Stock initial") }, singleLine = true)
                     }
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(value = priceText, onValueChange = { priceText = it.filter(Char::isDigit) }, Modifier.fillMaxWidth().testTag("qr_price_input"), label = { Text("Prix de vente") }, trailingIcon = { Text("XOF", fontWeight = FontWeight.SemiBold, color = SleekTextSecondary, modifier = Modifier.padding(end = 10.dp)) }, singleLine = true)
+                    OutlinedTextField(value = priceText, onValueChange = { priceText = it.filter(Char::isDigit) }, modifier = Modifier.fillMaxWidth().testTag("qr_price_input"), label = { Text("Prix de vente") }, trailingIcon = { Text("XOF", fontWeight = FontWeight.SemiBold, color = SleekTextSecondary, modifier = Modifier.padding(end = 10.dp)) }, singleLine = true)
                     Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), Modifier.fillMaxWidth()) {
-                        Button(onClick = ::persistEditor, Modifier.weight(1f).testTag("qr_save_button"), shape = SiraPillShape) { Icon(if (editing == null) Icons.Default.Add else Icons.Default.Edit, null, Modifier.size(18.dp)); Spacer(Modifier.width(7.dp)); Text(if (editing == null) "Enregistrer + QR" else "Enregistrer les modifications") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = ::persistEditor, modifier = Modifier.weight(1f).testTag("qr_save_button"), shape = SiraPillShape) { Icon(if (editing == null) Icons.Default.Add else Icons.Default.Edit, null, Modifier.size(18.dp)); Spacer(Modifier.width(7.dp)); Text(if (editing == null) "Enregistrer + QR" else "Enregistrer les modifications") }
                         if (editing != null) OutlinedButton(onClick = ::clearEditor, shape = SiraPillShape) { Text("Annuler") }
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = { val results = savedCodes.map { printer.printProductQrLabel(it.productName, it.price, it.payload, "FCFA") }; Toast.makeText(context, "${results.count { it.isSuccess }} QR envoyé(s)", Toast.LENGTH_LONG).show() }, Modifier.weight(1f), shape = SiraPillShape, enabled = savedCodes.isNotEmpty()) { Icon(Icons.Default.Print, null, Modifier.size(17.dp)); Spacer(Modifier.width(5.dp)); Text("Imprimer tous") }
-                OutlinedButton(onClick = { exportLauncher.launch("sira-qr-backup.csv") }, Modifier.weight(1f), shape = SiraPillShape, enabled = savedCodes.isNotEmpty()) { Icon(Icons.Default.SaveAlt, null, Modifier.size(17.dp)); Spacer(Modifier.width(5.dp)); Text("Sauvegarder") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { val results = savedCodes.map { printer.printProductQrLabel(it.productName, it.price, it.payload, "FCFA") }; Toast.makeText(context, "${results.count { it.isSuccess }} QR envoyé(s)", Toast.LENGTH_LONG).show() }, modifier = Modifier.weight(1f), shape = SiraPillShape, enabled = savedCodes.isNotEmpty()) { Icon(Icons.Default.Print, null, Modifier.size(17.dp)); Spacer(Modifier.width(5.dp)); Text("Imprimer tous") }
+                OutlinedButton(onClick = { exportLauncher.launch("sira-qr-backup.csv") }, modifier = Modifier.weight(1f), shape = SiraPillShape, enabled = savedCodes.isNotEmpty()) { Icon(Icons.Default.SaveAlt, null, Modifier.size(17.dp)); Spacer(Modifier.width(5.dp)); Text("Sauvegarder") }
             }
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(value = search, onValueChange = { search = it }, Modifier.fillMaxWidth().testTag("qr_saved_search"), label = { Text("Rechercher un QR") }, singleLine = true, leadingIcon = { Icon(Icons.Default.QrCode2, null) })
+            OutlinedTextField(value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth().testTag("qr_saved_search"), label = { Text("Rechercher un QR") }, singleLine = true, leadingIcon = { Icon(Icons.Default.QrCode2, null) })
             Spacer(Modifier.height(8.dp))
             Text("QR ENREGISTRÉS · ${visibleCodes.size}", fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp, color = SleekTextTertiary)
         }
@@ -169,11 +169,11 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
 }
 
 @Composable private fun StatChip(label: String, value: String, modifier: Modifier = Modifier) {
-    Surface(RoundedCornerShape(12.dp), SleekSurfaceVariant, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .45f)), modifier) { Column(Modifier.padding(8.dp)) { Text(value, fontSize = 15.sp, fontWeight = FontWeight.Black, color = SleekTextPrimary); Text(label, fontSize = 9.sp, color = SleekTextSecondary) } }
+    Surface(modifier = modifier, shape = RoundedCornerShape(12.dp), color = SleekSurfaceVariant, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .45f))) { Column(Modifier.padding(8.dp)) { Text(value, fontSize = 15.sp, fontWeight = FontWeight.Black, color = SleekTextPrimary); Text(label, fontSize = 9.sp, color = SleekTextSecondary) } }
 }
 
 @Composable private fun ProductQrCard(code: ProductQrCode, numberFormat: NumberFormat, onEdit: () -> Unit, onDelete: () -> Unit, onRegenerate: () -> Unit, onPrint: () -> Unit, onShare: () -> Unit) {
-    Surface(SiraCardShape, SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .62f)), shadowElevation = 1.dp, Modifier.fillMaxWidth()) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = SiraCardShape, color = SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .62f)), shadowElevation = 1.dp) {
         Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
             val bitmap = remember(code.payload) { createQrBitmap(code.payload, 180) }
             Image(bitmap.asImageBitmap(), "QR ${code.productName}", Modifier.size(104.dp))
@@ -183,12 +183,12 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
                 if (code.variant.isNotBlank()) Text("Variante : ${code.variant}", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = SleekTextSecondary)
                 Text("${numberFormat.format(code.price.toLong())} F", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = SleekBluePrimary, modifier = Modifier.padding(top = 3.dp))
                 Text("Code : ${code.payload}", fontSize = 9.sp, color = SleekTextSecondary, maxLines = 2)
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), Modifier.padding(top = 5.dp)) {
-                    IconButton(onClick = onEdit, Modifier.size(34.dp)) { Icon(Icons.Default.Edit, "Modifier", tint = SleekBluePrimary, Modifier.size(17.dp)) }
-                    IconButton(onClick = onPrint, Modifier.size(34.dp)) { Icon(Icons.Default.Print, "Imprimer", tint = SleekTextSecondary, Modifier.size(17.dp)) }
-                    IconButton(onClick = onShare, Modifier.size(34.dp)) { Icon(Icons.Default.Share, "Partager", tint = SleekTextSecondary, Modifier.size(17.dp)) }
-                    IconButton(onClick = onRegenerate, Modifier.size(34.dp)) { Icon(Icons.Default.Refresh, "Régénérer", tint = SleekTextSecondary, Modifier.size(17.dp)) }
-                    IconButton(onClick = onDelete, Modifier.size(34.dp)) { Icon(Icons.Default.Delete, "Supprimer", tint = SleekError, Modifier.size(17.dp)) }
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 5.dp)) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) { Icon(Icons.Default.Edit, "Modifier", tint = SleekBluePrimary, modifier = Modifier.size(17.dp)) }
+                    IconButton(onClick = onPrint, modifier = Modifier.size(34.dp)) { Icon(Icons.Default.Print, "Imprimer", tint = SleekTextSecondary, modifier = Modifier.size(17.dp)) }
+                    IconButton(onClick = onShare, modifier = Modifier.size(34.dp)) { Icon(Icons.Default.Share, "Partager", tint = SleekTextSecondary, modifier = Modifier.size(17.dp)) }
+                    IconButton(onClick = onRegenerate, modifier = Modifier.size(34.dp)) { Icon(Icons.Default.Refresh, "Régénérer", tint = SleekTextSecondary, modifier = Modifier.size(17.dp)) }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) { Icon(Icons.Default.Delete, "Supprimer", tint = SleekError, modifier = Modifier.size(17.dp)) }
                 }
             }
         }

@@ -4,17 +4,14 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.TypeConverters
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.dao.*
 import com.example.data.entity.*
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 @Database(
     entities = [
         Product::class,
+        ProductQrCode::class,
         Sale::class,
         SaleItem::class,
         Purchase::class,
@@ -24,11 +21,12 @@ import kotlinx.coroutines.launch
         CashTransaction::class,
         SyncLog::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class SiraDatabase : RoomDatabase() {
     abstract fun productDao(): ProductDao
+    abstract fun productQrCodeDao(): ProductQrCodeDao
     abstract fun saleDao(): SaleDao
     abstract fun purchaseDao(): PurchaseDao
     abstract fun customerDao(): CustomerDao
@@ -50,9 +48,7 @@ abstract class SiraDatabase : RoomDatabase() {
                         val dbFiles = dbDir.listFiles() ?: emptyArray()
                         for (f in dbFiles) {
                             if (f.name.startsWith("sira_user_")) {
-                                try {
-                                    context.deleteDatabase(f.name)
-                                } catch (ignored: Exception) {}
+                                try { context.deleteDatabase(f.name) } catch (ignored: Exception) {}
                             }
                         }
                     }
@@ -69,9 +65,7 @@ abstract class SiraDatabase : RoomDatabase() {
                 val dbFiles = dbDir.listFiles() ?: emptyArray()
                 for (f in dbFiles) {
                     if (f.name.startsWith("sira_user_")) {
-                        try {
-                            context.deleteDatabase(f.name)
-                        } catch (ignored: Exception) {}
+                        try { context.deleteDatabase(f.name) } catch (ignored: Exception) {}
                     }
                 }
             }
@@ -79,25 +73,17 @@ abstract class SiraDatabase : RoomDatabase() {
             DEFAULT_INSTANCE = null
         }
 
-        fun getDatabase(context: Context, scope: CoroutineScope): SiraDatabase {
-            return getDatabaseForUser(context, "default", scope)
-        }
+        fun getDatabase(context: Context, scope: CoroutineScope): SiraDatabase = getDatabaseForUser(context, "default", scope)
 
         fun getDatabaseForUser(context: Context, userId: String, scope: CoroutineScope): SiraDatabase {
             purgeAllSimulatedData(context)
             val cleanId = if (userId.isBlank()) "default" else userId.replace("[^a-zA-Z0-9_]".toRegex(), "_")
             return userInstances.computeIfAbsent(cleanId) {
                 val dbName = "sira_user_${cleanId}.db"
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    SiraDatabase::class.java,
-                    dbName
-                )
+                val instance = Room.databaseBuilder(context.applicationContext, SiraDatabase::class.java, dbName)
                     .fallbackToDestructiveMigration(true)
                     .build()
-                if (cleanId == "default") {
-                    DEFAULT_INSTANCE = instance
-                }
+                if (cleanId == "default") DEFAULT_INSTANCE = instance
                 instance
             }
         }

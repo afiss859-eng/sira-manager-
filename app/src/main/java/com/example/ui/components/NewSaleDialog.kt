@@ -54,14 +54,14 @@ fun NewSaleDialog(products: List<Product>, customers: List<Customer>, currentPay
     LaunchedEffect(scannerStatus) { if (scannerStatus != null) { kotlinx.coroutines.delay(1400); scannerStatus = null } }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(.96f).fillMaxHeight(.94f).testTag("new_sale_dialog"), RoundedCornerShape(28.dp), MaterialTheme.colorScheme.background) {
+        Surface(modifier = Modifier.fillMaxWidth(.96f).fillMaxHeight(.94f).testTag("new_sale_dialog"), shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(20.dp, 18.dp, 12.dp, 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(Modifier.weight(1f)) { Text("Nouvelle vente", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold); Text("Scannez un QR ou ajoutez les articles puis encaissez", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    Surface(CircleShape, MaterialTheme.colorScheme.surface) { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Fermer") } }
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface) { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Fermer") } }
                 }
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    Surface(RoundedCornerShape(16.dp), MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .14f))) {
+                    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .14f)), modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(14.dp)) {
                             ExposedDropdownMenuBox(expanded = customerDropdownExpanded, onExpandedChange = { customerDropdownExpanded = it }) {
                                 OutlinedTextField(value = selectedCustomer?.fullName ?: customerNameInput, onValueChange = { customerNameInput = it; selectedCustomer = null }, label = { Text("Client") }, leadingIcon = { Icon(Icons.Default.PersonOutline, null) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(customerDropdownExpanded) }, modifier = Modifier.fillMaxWidth().menuAnchor(), singleLine = true, shape = RoundedCornerShape(14.dp))
@@ -72,7 +72,7 @@ fun NewSaleDialog(products: List<Product>, customers: List<Customer>, currentPay
                             }
                             Spacer(Modifier.height(10.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                OutlinedTextField(value = productSearch, onValueChange = { productSearch = it }, modifier = Modifier.weight(1f).testTag("product_search_input"), singleLine = true, shape = RoundedCornerShape(14.dp), leadingIcon = { Icon(Icons.Default.Search, null) }, trailingIcon = { if (productSearch.isNotEmpty()) IconButton({ productSearch = "" }) { Icon(Icons.Default.Clear, "Effacer") } }, placeholder = { Text("Produit, code ou QR") })
+                                OutlinedTextField(value = productSearch, onValueChange = { productSearch = it }, modifier = Modifier.weight(1f).testTag("product_search_input"), singleLine = true, shape = RoundedCornerShape(14.dp), leadingIcon = { Icon(Icons.Default.Search, null) }, trailingIcon = { if (productSearch.isNotEmpty()) IconButton(onClick = { productSearch = "" }) { Icon(Icons.Default.Clear, "Effacer") } }, placeholder = { Text("Produit, code ou QR") })
                                 Spacer(Modifier.width(8.dp))
                                 FilledIconButton(onClick = { scannerStatus = null; scannerOpen = true }, modifier = Modifier.size(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.QrCodeScanner, "Scanner un code-barres") }
                             }
@@ -84,19 +84,19 @@ fun NewSaleDialog(products: List<Product>, customers: List<Customer>, currentPay
                 LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 8.dp)) {
                     items(visibleProducts, key = { it.id }) { product ->
                         val qty = cart[product.id] ?: 0; val unavailable = product.quantity <= 0
-                        Surface(RoundedCornerShape(18.dp), if (qty > 0) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .24f) else MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, if (qty > 0) MaterialTheme.colorScheme.primary.copy(alpha = .5f) else MaterialTheme.colorScheme.outline.copy(alpha = .12f)), Modifier.fillMaxWidth()) {
+                        Surface(shape = RoundedCornerShape(18.dp), color = if (qty > 0) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .24f) else MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, if (qty > 0) MaterialTheme.colorScheme.primary.copy(alpha = .5f) else MaterialTheme.colorScheme.outline.copy(alpha = .12f)), modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.padding(14.dp, 12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) { Text(product.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge); Text("${numberFormat.format(product.salePrice.toLong())} FCFA • Stock ${product.quantity}", style = MaterialTheme.typography.labelSmall, color = if (unavailable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(CircleShape, MaterialTheme.colorScheme.surfaceVariant, Modifier.size(36.dp)) { IconButton(onClick = { if (qty > 1) cart[product.id] = qty - 1 else cart.remove(product.id) }, enabled = qty > 0) { Icon(Icons.Default.Remove, "Retirer") } }
+                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.size(36.dp)) { IconButton(onClick = { if (qty > 1) cart[product.id] = qty - 1 else cart.remove(product.id) }, enabled = qty > 0) { Icon(Icons.Default.Remove, "Retirer") } }
                                     Text(qty.toString(), Modifier.padding(horizontal = 12.dp), fontWeight = FontWeight.Bold)
-                                    Surface(CircleShape, MaterialTheme.colorScheme.primary, Modifier.size(36.dp)) { IconButton(onClick = { if (!unavailable && qty < product.quantity) cart[product.id] = qty + 1 }, enabled = !unavailable && qty < product.quantity) { Icon(Icons.Default.Add, "Ajouter", tint = Color.White) } }
+                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp)) { IconButton(onClick = { if (!unavailable && qty < product.quantity) cart[product.id] = qty + 1 }, enabled = !unavailable && qty < product.quantity) { Icon(Icons.Default.Add, "Ajouter", tint = Color.White) } }
                                 }
                             }
                         }
                     }
                 }
-                Surface(Modifier.fillMaxWidth(), MaterialTheme.colorScheme.surface, shadowElevation = 8.dp, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
+                Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
                     Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("Règlement", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold); Text("$totalItems article(s) • ${numberFormat.format(totalAmount.toLong())} FCFA", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; Text("${numberFormat.format(totalAmount.toLong())} FCFA", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary) }
                         LazyRow(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(PaymentMethod.values().toList()) { method -> FilterChip(selected = selectedPaymentMethod == method, onClick = { selectedPaymentMethod = method }, leadingIcon = { Icon(when (method) { PaymentMethod.ESPECES -> Icons.Default.Payments; PaymentMethod.ORANGE_MONEY, PaymentMethod.MOOV_MONEY, PaymentMethod.CORIS_MONEY -> Icons.Default.PhoneAndroid; PaymentMethod.A_CREDIT -> Icons.Default.Schedule }, null, Modifier.size(16.dp)) }, label = { Text(method.label, fontSize = 12.sp) }) } }

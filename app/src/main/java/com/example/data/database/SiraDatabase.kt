@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.dao.*
 import com.example.data.entity.*
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +40,12 @@ abstract class SiraDatabase : RoomDatabase() {
         @Volatile
         private var DEFAULT_INSTANCE: SiraDatabase? = null
         private val userInstances = java.util.concurrent.ConcurrentHashMap<String, SiraDatabase>()
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS product_qr_codes (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, productId INTEGER NOT NULL, productName TEXT NOT NULL, price REAL NOT NULL, currency TEXT NOT NULL, payload TEXT NOT NULL, createdAt INTEGER NOT NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_product_qr_codes_productId ON product_qr_codes(productId)")
+            }
+        }
 
         fun purgeAllSimulatedData(context: Context) {
             try {
@@ -81,6 +89,7 @@ abstract class SiraDatabase : RoomDatabase() {
             return userInstances.computeIfAbsent(cleanId) {
                 val dbName = "sira_user_${cleanId}.db"
                 val instance = Room.databaseBuilder(context.applicationContext, SiraDatabase::class.java, dbName)
+                    .addMigrations(MIGRATION_1_2)
                     .fallbackToDestructiveMigration(true)
                     .build()
                 if (cleanId == "default") DEFAULT_INSTANCE = instance

@@ -175,17 +175,15 @@ private fun SiraBottomDock(currentTab: SiraNavTab, onTabSelected: (SiraNavTab) -
         SiraDockItem(SiraNavTab.PARAMETRES, Icons.Default.Settings, "Plus", "nav_parametres")
     )
     Surface(color = SleekSurface.copy(alpha = 0.98f), shadowElevation = 6.dp, tonalElevation = 0.dp, border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.72f)), modifier = Modifier.fillMaxWidth()) {
-        androidx.compose.foundation.horizontalScroll(rememberScrollState()).let { scrollModifier ->
-            Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 7.dp).then(scrollModifier), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
-                items.forEach { item ->
-                    val selected = currentTab == item.tab
-                    Column(modifier = Modifier.width(54.dp).testTag(item.tag).clickable { onTabSelected(item.tab) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(shape = SiraPillShape, color = if (selected) SleekBlueContainer else Color.Transparent, modifier = Modifier.height(32.dp).fillMaxWidth()) {
-                            Box(contentAlignment = Alignment.Center) { Icon(item.icon, contentDescription = item.label, tint = if (selected) SleekBlueOnContainer else SleekTextTertiary, modifier = Modifier.size(if (selected) 20.dp else 19.dp)) }
-                        }
-                        Spacer(Modifier.height(2.dp))
-                        Text(item.label, fontSize = 8.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, color = if (selected) SleekBlueOnContainer else SleekTextTertiary, maxLines = 1)
+        Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 7.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+            items.forEach { item ->
+                val selected = currentTab == item.tab
+                Column(modifier = Modifier.width(54.dp).testTag(item.tag).clickable { onTabSelected(item.tab) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(shape = SiraPillShape, color = if (selected) SleekBlueContainer else Color.Transparent, modifier = Modifier.height(32.dp).fillMaxWidth()) {
+                        Box(contentAlignment = Alignment.Center) { Icon(item.icon, contentDescription = item.label, tint = if (selected) SleekBlueOnContainer else SleekTextTertiary, modifier = Modifier.size(if (selected) 20.dp else 19.dp)) }
                     }
+                    Spacer(Modifier.height(2.dp))
+                    Text(item.label, fontSize = 8.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, color = if (selected) SleekBlueOnContainer else SleekTextTertiary, maxLines = 1)
                 }
             }
         }

@@ -63,9 +63,10 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.FRENCH) }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        if (uri != null) runCatching { context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(ProductQrBackup.toCsv(savedCodes)) } ?: error("Fichier inaccessible") }
-            .onSuccess { Toast.makeText(context, "Sauvegarde QR exportée", Toast.LENGTH_SHORT).show() }
-            .onFailure { Toast.makeText(context, it.message ?: "Export impossible", Toast.LENGTH_SHORT).show() }
+        if (uri != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { out -> out.writer().use { writer -> writer.write(ProductQrBackup.toCsv(savedCodes)) } } ?: error("Fichier inaccessible")
+        }.onSuccess { Toast.makeText(context, "Sauvegarde QR exportée", Toast.LENGTH_SHORT).show() }
+         .onFailure { Toast.makeText(context, it.message ?: "Export impossible", Toast.LENGTH_SHORT).show() }
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -77,7 +78,10 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
 
     LaunchedEffect(editing) {
         editing?.let {
-            scannedCode = it.payload; productName = it.productName; variant = it.variant; priceText = it.price.toLong().toString()
+            scannedCode = it.payload
+            productName = it.productName
+            variant = it.variant
+            priceText = it.price.toLong().toString()
             category = viewModel.products.value.firstOrNull { p -> p.id == editing?.productId }?.category.orEmpty()
         }
     }
@@ -110,8 +114,10 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
             }
             Spacer(Modifier.height(10.dp))
             Surface(SiraCardShape, SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .65f)), Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatChip("QR", savedCodes.size.toString()); StatChip("Variantes", savedCodes.count { it.variant.isNotBlank() }.toString()); StatChip("Scans", topScanned.sumOf { it.second }.toString())
+                Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatChip("QR", savedCodes.size.toString(), Modifier.weight(1f))
+                    StatChip("Variantes", savedCodes.count { it.variant.isNotBlank() }.toString(), Modifier.weight(1f))
+                    StatChip("Scans", topScanned.sumOf { it.second }.toString(), Modifier.weight(1f))
                 }
                 if (topScanned.isNotEmpty()) Text("Plus scannés : " + topScanned.joinToString(" • ") { payload -> "${savedCodes.firstOrNull { it.payload == payload.first }?.productName ?: payload.first} (${payload.second})" }, fontSize = 9.sp, color = SleekTextSecondary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp).padding(bottom = 10.dp), maxLines = 2)
             }
@@ -162,8 +168,8 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
     if (scannerOpen) BarcodeScannerDialog(statusMessage = null, onBarcodeScanned = { code -> scannedCode = code.trim(); scannerStatus = "✓ Référence capturée"; scannerOpen = false }, onDismiss = { scannerOpen = false })
 }
 
-@Composable private fun StatChip(label: String, value: String) {
-    Surface(RoundedCornerShape(12.dp), SleekSurfaceVariant, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .45f)), Modifier.weight(1f)) { Column(Modifier.padding(8.dp)) { Text(value, fontSize = 15.sp, fontWeight = FontWeight.Black, color = SleekTextPrimary); Text(label, fontSize = 9.sp, color = SleekTextSecondary) } }
+@Composable private fun StatChip(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(RoundedCornerShape(12.dp), SleekSurfaceVariant, border = BorderStroke(1.dp, SleekOutline.copy(alpha = .45f)), modifier) { Column(Modifier.padding(8.dp)) { Text(value, fontSize = 15.sp, fontWeight = FontWeight.Black, color = SleekTextPrimary); Text(label, fontSize = 9.sp, color = SleekTextSecondary) } }
 }
 
 @Composable private fun ProductQrCard(code: ProductQrCode, numberFormat: NumberFormat, onEdit: () -> Unit, onDelete: () -> Unit, onRegenerate: () -> Unit, onPrint: () -> Unit, onShare: () -> Unit) {
@@ -199,7 +205,7 @@ private fun shareQrImage(context: android.content.Context, code: ProductQrCode) 
         val bitmap = createQrBitmap(code.payload, 700)
         val values = ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, "SIRA-QR-${code.productName.take(24)}.png"); put(MediaStore.Images.Media.MIME_TYPE, "image/png"); if (Build.VERSION.SDK_INT >= 29) put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/SIRA") }
         val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: error("Impossible de créer l'image")
-        context.contentResolver.openOutputStream(uri).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        context.contentResolver.openOutputStream(uri)?.use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) } ?: error("Impossible d'écrire l'image")
         context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply { type = "image/png"; putExtra(android.content.Intent.EXTRA_STREAM, uri); addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }, "Partager le QR"))
     }.onFailure { Toast.makeText(context, it.message ?: "Partage impossible", Toast.LENGTH_SHORT).show() }
 }

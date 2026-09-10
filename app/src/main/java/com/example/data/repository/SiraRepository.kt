@@ -20,17 +20,15 @@ class SiraRepository(private val db: SiraDatabase) {
     val allSyncLogs: Flow<List<SyncLog>> = db.syncDao().getAllSyncLogs()
 
     suspend fun getProduct(id: Long) = db.productDao().getProductById(id)
-
     suspend fun insertProduct(product: Product): Long = withContext(Dispatchers.IO) { db.productDao().insertProduct(product) }
     suspend fun updateProduct(product: Product) = withContext(Dispatchers.IO) { db.productDao().updateProduct(product) }
     suspend fun adjustProductStock(productId: Long, delta: Int) = withContext(Dispatchers.IO) { db.productDao().adjustQuantity(productId, delta) }
-    suspend fun deleteProduct(product: Product) = withContext(Dispatchers.IO) {
-        db.productQrCodeDao().deleteQrCodesForProduct(product.id)
-        db.productDao().deleteProduct(product)
-    }
+    suspend fun deleteProduct(product: Product) = withContext(Dispatchers.IO) { db.productQrCodeDao().deleteQrCodesForProduct(product.id); db.productDao().deleteProduct(product) }
 
     suspend fun insertProductQrCode(code: ProductQrCode): Long = withContext(Dispatchers.IO) { db.productQrCodeDao().insertQrCode(code) }
+    suspend fun updateProductQrCode(code: ProductQrCode) = withContext(Dispatchers.IO) { db.productQrCodeDao().updateQrCode(code) }
     suspend fun deleteProductQrCode(code: ProductQrCode) = withContext(Dispatchers.IO) { db.productQrCodeDao().deleteQrCode(code) }
+    suspend fun findProductQrByPayload(payload: String): ProductQrCode? = withContext(Dispatchers.IO) { db.productQrCodeDao().findByPayload(payload.trim()) }
 
     suspend fun recordSale(sale: Sale, items: List<SaleItem>): Long = withContext(Dispatchers.IO) {
         val saleId = db.saleDao().insertSale(sale)
@@ -56,7 +54,6 @@ class SiraRepository(private val db: SiraDatabase) {
     }
 
     suspend fun getSaleItems(saleId: Long): List<SaleItem> = withContext(Dispatchers.IO) { db.saleDao().getSaleItemsSync(saleId) }
-
     suspend fun recordPurchase(purchase: Purchase, items: List<PurchaseItem>): Long = withContext(Dispatchers.IO) {
         val purchaseId = db.purchaseDao().insertPurchase(purchase)
         val itemsWithPurchaseId = items.map { it.copy(purchaseId = purchaseId) }
@@ -71,7 +68,6 @@ class SiraRepository(private val db: SiraDatabase) {
         db.cashDao().insertCashTransaction(CashTransaction(type = CashOpType.ACHAT_DECAISSEMENT, channel = channel, amount = purchase.totalAmount, reference = "DEC-${purchase.reference}", beneficiaryOrPayer = purchase.supplierName, description = "Achat marchandise ${purchase.reference}"))
         purchaseId
     }
-
     suspend fun insertCustomer(customer: Customer): Long = withContext(Dispatchers.IO) { db.customerDao().insertCustomer(customer) }
     suspend fun updateCustomer(customer: Customer) = withContext(Dispatchers.IO) { db.customerDao().updateCustomer(customer) }
     suspend fun deleteCustomer(customer: Customer) = withContext(Dispatchers.IO) { db.customerDao().deleteCustomer(customer) }
@@ -93,12 +89,6 @@ class SiraRepository(private val db: SiraDatabase) {
     }
 }
 
-data class GlobalSearchResult(
-    val products: List<Product> = emptyList(),
-    val customers: List<Customer> = emptyList(),
-    val sales: List<Sale> = emptyList(),
-    val purchases: List<Purchase> = emptyList(),
-    val cashTransactions: List<CashTransaction> = emptyList()
-) {
+data class GlobalSearchResult(val products: List<Product> = emptyList(), val customers: List<Customer> = emptyList(), val sales: List<Sale> = emptyList(), val purchases: List<Purchase> = emptyList(), val cashTransactions: List<CashTransaction> = emptyList()) {
     val totalCount: Int get() = products.size + customers.size + sales.size + purchases.size + cashTransactions.size
 }

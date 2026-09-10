@@ -135,7 +135,7 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
             val pending = printQueue.takeAll()
             if (pending.isEmpty()) { _pendingPrintCount.value = 0; return@launch }
             _printStatus.value = "Tentative d'impression de ${pending.size} reçu(s)…"
-            val remaining = mutableListOf<Pair<Sale, List<SaleItem>>()
+            val remaining = mutableListOf<Pair<Sale, List<SaleItem>>>()
             for (receipt in pending) { val result = bluetoothPrinter.printSale(receipt.first, receipt.second); if (result.isFailure) remaining += receipt }
             printQueue.replace(remaining); _pendingPrintCount.value = remaining.size
             _printStatus.value = if (remaining.isEmpty()) "Reçu(s) imprimé(s) automatiquement" else "${remaining.size} reçu(s) en attente d'impression"

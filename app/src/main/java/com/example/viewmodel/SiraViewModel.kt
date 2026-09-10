@@ -25,7 +25,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-
 enum class SiraNavTab(val title: String) {
     DASHBOARD("Tableau"), STOCK("Stock"), QR_CODES("QR produits"), VENTES("Ventes"), CAISSE("Caisse"), PARTENAIRES("Clients"), INTELLIGENCE("SIRA IA"), ADMIN_CENTER("Admin Web"), PARAMETRES("Plus")
 }
@@ -106,12 +105,28 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
     fun saveProductQrCode(product: Product?, price: Double) {
         if (product == null || price <= 0) return
         viewModelScope.launch(Dispatchers.IO) {
-            val payload = "{\"v\":1,\"type\":\"SIRA_PRODUCT\",\"productId\":${product.id},\"name\":${jsonString(product.name)},\"price\":$price,\"currency\":\"XOF\"}"
+            val payload = product.barcode?.trim().takeUnless { it.isNullOrBlank() } ?: return@launch
             _repository.value.insertProductQrCode(ProductQrCode(productId = product.id, productName = product.name, price = price, currency = "XOF", payload = payload))
         }
     }
+    fun saveScannedProductQr(scannedCode: String, productName: String, price: Double, category: String, initialStock: Int = 0) {
+        val code = scannedCode.trim()
+        val name = productName.trim()
+        if (code.isBlank() || name.isBlank() || price <= 0) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val existing = products.value.firstOrNull { it.barcode?.trim().equals(code, ignoreCase = true) }
+            val productId = if (existing != null) {
+                if (existing.name != name || existing.salePrice != price || existing.category != category) {
+                    _repository.value.updateProduct(existing.copy(name = name, category = category.ifBlank { existing.category }, salePrice = price))
+                }
+                existing.id
+            } else {
+                _repository.value.insertProduct(Product(name = name, category = category.ifBlank { "Général" }, quantity = initialStock.coerceAtLeast(0), purchasePrice = 0.0, salePrice = price, barcode = code))
+            }
+            _repository.value.insertProductQrCode(ProductQrCode(productId = productId, productName = name, price = price, currency = "XOF", payload = code))
+        }
+    }
     fun deleteProductQrCode(code: ProductQrCode) { viewModelScope.launch(Dispatchers.IO) { _repository.value.deleteProductQrCode(code) } }
-    private fun jsonString(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
     fun setDefaultBluetoothPrinter(macAddress: String) { bluetoothPrinter.setDefaultPrinter(macAddress); _defaultPrinterMac.value = bluetoothPrinter.getDefaultPrinterMac(); _printStatus.value = "Imprimante configurée : $macAddress"; retryPendingReceiptPrints() }
     fun clearPrintStatus() { _printStatus.value = null }
     private fun enqueueReceiptPrint(sale: Sale, items: List<SaleItem>) { printQueue.enqueue(sale, items); _pendingPrintCount.value = printQueue.pendingCount(); retryPendingReceiptPrints() }
@@ -120,7 +135,7 @@ class SiraViewModel(application: Application) : AndroidViewModel(application) {
             val pending = printQueue.takeAll()
             if (pending.isEmpty()) { _pendingPrintCount.value = 0; return@launch }
             _printStatus.value = "Tentative d'impression de ${pending.size} reçu(s)…"
-            val remaining = mutableListOf<Pair<Sale, List<SaleItem>>>()
+            val remaining = mutableListOf<Pair<Sale, List<SaleItem>>()
             for (receipt in pending) { val result = bluetoothPrinter.printSale(receipt.first, receipt.second); if (result.isFailure) remaining += receipt }
             printQueue.replace(remaining); _pendingPrintCount.value = remaining.size
             _printStatus.value = if (remaining.isEmpty()) "Reçu(s) imprimé(s) automatiquement" else "${remaining.size} reçu(s) en attente d'impression"

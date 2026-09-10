@@ -2,9 +2,6 @@ package com.example.ui.screens
 
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.MultiFormatWriter
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,37 +14,39 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.entity.Product
 import com.example.data.entity.ProductQrCode
+import com.example.ui.components.BarcodeScannerDialog
 import com.example.ui.theme.*
 import com.example.viewmodel.SiraViewModel
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.MultiFormatWriter
 import java.text.NumberFormat
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductQrScreen(viewModel: SiraViewModel) {
-    val products by viewModel.products.collectAsState()
     val savedCodes by viewModel.productQrCodes.collectAsState()
-    var selectedProductId by remember { mutableStateOf<Long?>(null) }
+    var scannerOpen by remember { mutableStateOf(false) }
+    var scannedCode by remember { mutableStateOf("") }
+    var scannerStatus by remember { mutableStateOf<String?>(null) }
+    var productName by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("") }
     var priceText by remember { mutableStateOf("") }
-    var search by remember { mutableStateOf("") }
-
-    val selectedProduct = products.firstOrNull { it.id == selectedProductId }
-    val filteredProducts = remember(products, search) {
-        products.filter { it.name.contains(search, true) || it.category.contains(search, true) || it.barcode?.contains(search, true) == true }
-    }
+    var stockText by remember { mutableStateOf("0") }
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.FRENCH) }
 
     Column(Modifier.fillMaxSize().background(SleekBackground).testTag("product_qr_screen")) {
@@ -56,7 +55,7 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
                 Column(Modifier.weight(1f)) {
                     Text("QR produits", fontSize = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.7).sp, color = SleekTextPrimary)
                     Spacer(Modifier.height(3.dp))
-                    Text("Enregistrez un QR avec le produit et son prix de vente.", fontSize = 12.sp, color = SleekTextSecondary)
+                    Text("Scannez une référence une fois, associez son nom et son prix, puis utilisez ce QR à chaque vente.", fontSize = 12.sp, color = SleekTextSecondary)
                 }
                 Surface(shape = CircleShape, color = SleekBlueContainer, modifier = Modifier.size(42.dp)) {
                     Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.QrCode2, contentDescription = null, tint = SleekBlueOnContainer, modifier = Modifier.size(22.dp)) }
@@ -66,34 +65,31 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
 
             Surface(shape = SiraCardShape, color = SleekSurface, border = BorderStroke(1.dp, SleekOutline.copy(alpha = 0.65f)), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(15.dp)) {
-                    Text("Nouveau QR", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SleekTextPrimary)
-                    Text("Le prix peut être différent du prix actuel du catalogue.", fontSize = 10.sp, color = SleekTextSecondary, modifier = Modifier.padding(top = 3.dp))
+                    Text("1 · Scanner le produit", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SleekTextPrimary)
+                    Text("Utilisez le code-barres/QR existant du produit. Il devient sa référence SIRA.", fontSize = 10.sp, color = SleekTextSecondary, modifier = Modifier.padding(top = 3.dp))
                     Spacer(Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = search,
-                        onValueChange = { search = it },
-                        modifier = Modifier.fillMaxWidth().testTag("qr_product_search"),
-                        label = { Text("Rechercher un produit") },
-                        singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.QrCode2, null) }
-                    )
-                    Spacer(Modifier.height(7.dp))
-                    ExposedDropdownMenuBox(expanded = selectedProductId == -1L, onExpandedChange = { selectedProductId = if (selectedProductId == -1L) null else -1L }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
-                            value = selectedProduct?.let { "${it.name} · ${numberFormat.format(it.salePrice.toLong())} F" } ?: "Sélectionner un produit",
-                            onValueChange = {}, readOnly = true,
-                            modifier = Modifier.menuAnchor().fillMaxWidth(), label = { Text("Produit") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = selectedProductId == -1L) }
+                            value = scannedCode,
+                            onValueChange = { scannedCode = it },
+                            modifier = Modifier.weight(1f).testTag("qr_scanned_code"),
+                            label = { Text("Code scanné") },
+                            singleLine = true
                         )
-                        ExposedDropdownMenu(expanded = selectedProductId == -1L, onDismissRequest = { selectedProductId = null }) {
-                            filteredProducts.take(60).forEach { product ->
-                                DropdownMenuItem(
-                                    text = { Text("${product.name} · ${numberFormat.format(product.salePrice.toLong())} F") },
-                                    onClick = { selectedProductId = product.id; priceText = product.salePrice.toLong().toString() }
-                                )
-                            }
+                        Spacer(Modifier.width(8.dp))
+                        FilledIconButton(onClick = { scannerStatus = null; scannerOpen = true }, modifier = Modifier.size(56.dp), shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = SleekBluePrimary, contentColor = Color.White)) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scanner le produit")
                         }
+                    }
+                    if (scannerStatus != null) {
+                        Text(scannerStatus!!, fontSize = 10.sp, color = SleekBluePrimary, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(value = productName, onValueChange = { productName = it }, modifier = Modifier.fillMaxWidth().testTag("qr_product_name"), label = { Text("Nom du produit") }, singleLine = true)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(value = category, onValueChange = { category = it }, modifier = Modifier.weight(1f), label = { Text("Catégorie") }, singleLine = true)
+                        OutlinedTextField(value = stockText, onValueChange = { stockText = it.filter(Char::isDigit) }, modifier = Modifier.weight(0.62f), label = { Text("Stock") }, singleLine = true)
                     }
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -107,23 +103,21 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
                     Spacer(Modifier.height(10.dp))
                     Button(
                         onClick = {
-                            selectedProduct?.let { product ->
-                                val price = priceText.toDoubleOrNull() ?: product.salePrice
-                                if (price > 0) viewModel.saveProductQrCode(product, price)
-                            }
+                            val price = priceText.toDoubleOrNull() ?: 0.0
+                            viewModel.saveScannedProductQr(scannedCode, productName, price, category, stockText.toIntOrNull() ?: 0)
+                            scannerStatus = "✓ Produit enregistré et QR prêt à imprimer"
                         },
-                        enabled = selectedProduct != null && (priceText.toDoubleOrNull() ?: 0.0) > 0,
-                        modifier = Modifier.fillMaxWidth().testTag("qr_save_button"),
-                        shape = SiraPillShape
+                        enabled = scannedCode.isNotBlank() && productName.isNotBlank() && (priceText.toDoubleOrNull() ?: 0.0) > 0,
+                        modifier = Modifier.fillMaxWidth().testTag("qr_save_button"), shape = SiraPillShape
                     ) {
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Enregistrer le QR", fontWeight = FontWeight.SemiBold)
+                        Text("Enregistrer produit + QR", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
             Spacer(Modifier.height(14.dp))
-            Text("QR ENREGISTRÉS · ${savedCodes.size}", fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = SleekTextTertiary)
+            Text("2 · QR ENREGISTRÉS · ${savedCodes.size}", fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = SleekTextTertiary)
         }
 
         if (savedCodes.isEmpty()) {
@@ -133,17 +127,29 @@ fun ProductQrScreen(viewModel: SiraViewModel) {
                         Icon(Icons.Default.QrCode2, null, tint = SleekTextTertiary, modifier = Modifier.size(42.dp))
                         Spacer(Modifier.height(8.dp))
                         Text("Aucun QR enregistré", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SleekTextPrimary)
-                        Text("Choisissez un produit puis enregistrez son prix.", fontSize = 11.sp, color = SleekTextSecondary)
+                        Text("Scannez un produit, renseignez son nom et son prix.", fontSize = 11.sp, color = SleekTextSecondary)
                     }
                 }
             }
         } else {
             LazyColumn(contentPadding = PaddingValues(horizontal = 18.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.fillMaxSize()) {
                 items(savedCodes, key = { it.id }) { code ->
-                    ProductQrCard(code, numberFormat, onDelete = { viewModel.deleteProductQrCode(code) }, onRegenerate = { viewModel.saveProductQrCode(products.firstOrNull { it.id == code.productId }, code.price) })
+                    ProductQrCard(code, numberFormat, onDelete = { viewModel.deleteProductQrCode(code) }, onRegenerate = { viewModel.saveProductQrCode(viewModel.products.value.firstOrNull { it.id == code.productId }, code.price) })
                 }
             }
         }
+    }
+
+    if (scannerOpen) {
+        BarcodeScannerDialog(
+            statusMessage = scannerStatus,
+            onBarcodeScanned = { code ->
+                scannedCode = code.trim()
+                scannerStatus = "✓ Référence capturée : $scannedCode"
+                scannerOpen = false
+            },
+            onDismiss = { scannerOpen = false }
+        )
     }
 }
 
@@ -158,7 +164,8 @@ private fun ProductQrCard(code: ProductQrCode, numberFormat: NumberFormat, onDel
                 Text(code.productName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SleekTextPrimary, maxLines = 2)
                 Spacer(Modifier.height(4.dp))
                 Text("${numberFormat.format(code.price.toLong())} F", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = SleekBluePrimary)
-                Text("Scannable par SIRA · ${code.currency}", fontSize = 10.sp, color = SleekTextSecondary, modifier = Modifier.padding(top = 3.dp))
+                Text("Code : ${code.payload}", fontSize = 9.sp, color = SleekTextSecondary, maxLines = 2)
+                Text("Au scan : nom + prix + produit sont repris dans la vente.", fontSize = 10.sp, color = SleekTextSecondary, modifier = Modifier.padding(top = 3.dp))
                 Spacer(Modifier.height(7.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     AssistChip(onClick = onRegenerate, label = { Text("Régénérer", fontSize = 10.sp) }, leadingIcon = { Icon(Icons.Default.Refresh, null, modifier = Modifier.size(15.dp)) })

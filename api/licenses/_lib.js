@@ -1,19 +1,20 @@
 const crypto = require('node:crypto');
 
-const VERSION = 2;
+const VERSION = 3;
+const LEGACY_VERSION = 2;
 const PREFIX = 'SIRA-LIC';
 const MODELS = ['BOUTIQUE', 'NATIONAL', 'INTERNATIONAL'];
 const KEYPADS = ['GRID_4', 'GRID_2', 'LIST_COMPACT'];
 
 function licenseSecret() {
-  const secret = String(process.env.SIRA_LICENSE_SECRET || process.env.SIRA_ADMIN_SECRET || '').trim();
+  const secret = String(process.env.SIRA_LICENSE_SECRET || '').trim();
   if (secret.length < 32) throw new Error('SIRA_LICENSE_SECRET non configuré ou trop court.');
   return secret;
 }
 
 function base64url(value) { return Buffer.from(value, 'utf8').toString('base64url'); }
 function fromBase64url(value) { return Buffer.from(value, 'base64url').toString('utf8'); }
-function sign(payload) { return crypto.createHmac('sha256', licenseSecret()).update(payload).digest('hex').slice(0, 16).toUpperCase(); }
+function sign(payload, bytes = 32) { return crypto.createHmac('sha256', licenseSecret()).update(payload).digest('hex').slice(0, bytes).toUpperCase(); }
 
 function profileFor(model) {
   const national = model === 'NATIONAL' || model === 'INTERNATIONAL';
@@ -45,7 +46,7 @@ function createLicense(input = {}) {
   const durationDays = durationDaysFor(input.durationDays);
   const expiresAt = new Date(createdAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
   const payloadObject = {
-    v: VERSION, id: crypto.randomBytes(9).toString('hex').toUpperCase(),
+    v: VERSION, id: crypto.randomBytes(16).toString('hex').toUpperCase(),
     merchantName: cleanString(input.merchantName, 'Commerce SIRA'), shopName: cleanString(input.shopName, 'SIRA Business'),
     maxUsers, stockModel, appName: cleanString(input.appName, 'SIRA Business'),
     profilePhotoUrl: cleanString(input.profilePhotoUrl, '', 500), logoUrl: cleanString(input.logoUrl, '', 500),
@@ -57,7 +58,7 @@ function createLicense(input = {}) {
     createdAt: createdAt.toISOString(), durationDays, expiresAt: expiresAt.toISOString()
   };
   const payload = base64url(JSON.stringify(payloadObject));
-  return `${PREFIX}-${payload}.${sign(payload)}`;
+  return `${PREFIX}-${payload}.${sign(payload, 32)}`;
 }
 
 function decodeLicense(key) {
@@ -66,11 +67,15 @@ function decodeLicense(key) {
   const body = input.slice(PREFIX.length + 1); const dot = body.lastIndexOf('.');
   if (dot <= 0) return null;
   const payload = body.slice(0, dot); const signature = body.slice(dot + 1).toUpperCase();
-  if (sign(payload) !== signature) return null;
+  if (!signature || !/^[0-9A-F]+$/.test(signature)) return null;
   try {
     const data = JSON.parse(fromBase64url(payload));
-    if (!data || data.v !== VERSION || !MODELS.includes(data.stockModel)) return null;
-    data.maxUsers = Math.max(1, Number(data.maxUsers) || 1);
+    if (!data || ![LEGACY_VERSION, VERSION].includes(Number(data.v)) || !MODELS.includes(data.stockModel)) return null;
+    const version = Number(data.v);
+    const expected = version === LEGACY_VERSION ? sign(payload, 16) : sign(payload, 32);
+    const a = Buffer.from(signature, 'utf8'); const b = Buffer.from(expected, 'utf8');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+    data.maxUsers = Math.max(1, Math.min(100000, Number(data.maxUsers) || 1));
     data.features = profileFor(data.stockModel);
     data.durationDays = durationDaysFor(data.durationDays);
     data.expiresAt = typeof data.expiresAt === 'string' ? data.expiresAt : null;

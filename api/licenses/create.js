@@ -1,7 +1,9 @@
 const { createLicense, decodeLicense } = require('./_lib');
+const { requireAdmin } = require('../admin/_auth');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Méthode non autorisée.' });
+  if (!requireAdmin(req, res)) return;
   try {
     const body = req.body || {};
     const licenseKey = createLicense(body);

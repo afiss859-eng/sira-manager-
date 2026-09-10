@@ -1,26 +1,11 @@
 {
-  "users": [
-    {
-      "id": "sawadogoafis125_gmail_com",
-      "email": "sawadogoafis125@gmail.com",
-      "displayName": "Afis Sawadogo",
-      "shopName": "SIRA Direction Centrale",
-      "city": "Ouagadougou",
-      "phone": "+226 56 06 09 76",
-      "role": "SUPER_ADMIN",
-      "productCount": 0,
-      "saleCount": 0,
-      "totalRevenueFcfa": 0,
-      "isActive": true,
-      "isApproved": true,
-      "ifuNumber": "BF-ADMIN-001"
-    }
-  ],
+  "users": [],
   "directives": [],
   "apiKeys": {
     "geminiApiKey": "",
     "cinetPayApiKey": "",
-    "cinetPaySiteId": "",
+    "payDunyaMasterKey": "",
+    "payDunyaToken": "",
     "orangeMoneyMerchantCode": "",
     "orangeMoneyApiKey": ""
   },

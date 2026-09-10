@@ -38,6 +38,21 @@ interface ProductDao {
 }
 
 @Dao
+interface ProductQrCodeDao {
+    @Query("SELECT * FROM product_qr_codes ORDER BY createdAt DESC, id DESC")
+    fun getAllQrCodes(): Flow<List<ProductQrCode>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertQrCode(code: ProductQrCode): Long
+
+    @Delete
+    suspend fun deleteQrCode(code: ProductQrCode)
+
+    @Query("DELETE FROM product_qr_codes WHERE productId = :productId")
+    suspend fun deleteQrCodesForProduct(productId: Long)
+}
+
+@Dao
 interface SaleDao {
     @Query("SELECT * FROM sales ORDER BY timestamp DESC")
     fun getAllSales(): Flow<List<Sale>>

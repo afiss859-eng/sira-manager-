@@ -15,10 +15,11 @@ test('creates and decodes a signed Business license', () => {
     currency: 'XOF'
   });
 
-  assert.match(key, /^SIRA-LIC-.+\.[A-F0-9]{16}$/);
+  assert.match(key, /^SIRA-LIC-.+\.[A-F0-9]{32}$/);
   const license = decodeLicense(key);
 
   assert.ok(license);
+  assert.equal(license.v, 3);
   assert.equal(license.merchantName, 'Commerce Test');
   assert.equal(license.shopName, 'Boutique Test');
   assert.equal(license.maxUsers, 7);
@@ -28,11 +29,11 @@ test('creates and decodes a signed Business license', () => {
   assert.equal(license.currency, 'XOF');
 });
 
-test('rejects tampered license payload', () => {
+test('rejects tampered license payload and signature', () => {
   const key = createLicense({ merchantName: 'Integrity Test' });
   const [head, signature] = key.split('.');
-  const tampered = `${head.slice(0, -1)}X.${signature}`;
-  assert.equal(decodeLicense(tampered), null);
+  assert.equal(decodeLicense(`${head.slice(0, -1)}X.${signature}`), null);
+  assert.equal(decodeLicense(`${head}.${signature.slice(0, -1)}0`), null);
 });
 
 test('normalizes invalid commercial configuration safely', () => {

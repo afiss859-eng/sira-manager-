@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "rewrites": [
+    { "source": "/", "destination": "/admin.html" }
+  ],
   "functions": {
     "api/**/*.js": {
       "runtime": "nodejs24.x"

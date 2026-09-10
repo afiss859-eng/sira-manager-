@@ -7,8 +7,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# GitHub is moving Actions runtime execution from Node 20 to Node 24.
-# Opt in early so the CI does not accumulate runtime deprecation warnings.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -18,7 +16,7 @@ concurrency:
 
 jobs:
   api-license:
-    name: API - license tests
+    name: API - license and admin tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -32,6 +30,10 @@ jobs:
         env:
           SIRA_LICENSE_SECRET: ${{ secrets.SIRA_LICENSE_SECRET_TEST }}
         run: node --test api/licenses/_lib.test.js
+      - name: Admin session unit tests
+        env:
+          SIRA_ADMIN_SECRET: test-admin-secret-012345678901234567890123456789
+        run: node --test api/admin/_auth.test.js
 
   business:
     name: SIRA Business - test and build

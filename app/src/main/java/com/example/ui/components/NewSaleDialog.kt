@@ -29,13 +29,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewSaleDialog(
-    products: List<Product>,
-    customers: List<Customer>,
-    currentPaymentEngine: PaymentEngine,
-    onDismiss: () -> Unit,
-    onCompleteSale: (Sale, List<SaleItem>) -> Unit
-) {
+fun NewSaleDialog(products: List<Product>, customers: List<Customer>, currentPaymentEngine: PaymentEngine, onDismiss: () -> Unit, onCompleteSale: (Sale, List<SaleItem>) -> Unit) {
     val context = LocalContext.current
     var selectedCustomer by remember { mutableStateOf<Customer?>(null) }
     var customerNameInput by remember { mutableStateOf("Client de passage") }
@@ -47,18 +41,20 @@ fun NewSaleDialog(
     var scannerStatus by remember { mutableStateOf<String?>(null) }
     val cart = remember { mutableStateMapOf<Long, Int>() }
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.FRENCH) }
-
-    val cartItems = remember(cart.toMap(), products) { cart.mapNotNull { (prodId, qty) -> products.find { it.id == prodId }?.let { product -> if (qty > 0) SaleItem(0, product.id, product.name, qty, product.salePrice, product.purchasePrice, qty * product.salePrice) else null } } }
+    val cartItems = remember(cart.toMap(), products) {
+        cart.mapNotNull { (prodId, qty) -> products.find { it.id == prodId }?.let { product ->
+            if (qty > 0) SaleItem(saleId = 0, productId = product.id, productName = product.name, quantity = qty, unitPrice = product.salePrice, unitCost = product.purchasePrice, subtotal = qty * product.salePrice) else null
+        } }
+    }
     val visibleProducts = remember(products, productSearch) { products.filter { productSearch.isBlank() || it.name.contains(productSearch, true) || it.barcode?.contains(productSearch, true) == true } }
     val totalAmount = cartItems.sumOf { it.subtotal }
     val totalCost = cartItems.sumOf { it.quantity * it.unitCost }
     val estimatedProfit = totalAmount - totalCost
     val totalItems = cartItems.sumOf { it.quantity }
-
     LaunchedEffect(scannerStatus) { if (scannerStatus != null) { kotlinx.coroutines.delay(1400); scannerStatus = null } }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.94f).testTag("new_sale_dialog"), RoundedCornerShape(28.dp), MaterialTheme.colorScheme.background) {
+        Surface(Modifier.fillMaxWidth(.96f).fillMaxHeight(.94f).testTag("new_sale_dialog"), RoundedCornerShape(28.dp), MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(20.dp, 18.dp, 12.dp, 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(Modifier.weight(1f)) { Text("Nouvelle vente", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold); Text("Scannez un QR ou ajoutez les articles puis encaissez", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
